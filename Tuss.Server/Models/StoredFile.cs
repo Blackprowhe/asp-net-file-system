@@ -9,5 +9,6 @@ public class StoredFile
     public bool IsFile { get; set; } = true;
     public long Bytes { get; set; }
     public string Extension { get; set; } = "";
+    // Aktuell version (null för mappar)
+    public int? CurrentVersion { get; set; }
 }
-
