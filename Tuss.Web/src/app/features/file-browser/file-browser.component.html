@@ -6,7 +6,11 @@
       <span class="section-title">Mina filer</span>
     </div>
     <div class="toolbar-right">
-      <button class="btn btn-ghost btn-icon" (click)="load()" [disabled]="loading()" aria-label="Uppdatera" title="Uppdatera">↻</button>
+      <button class="btn btn-ghost btn-icon"
+              (click)="load()"
+              [disabled]="loading()"
+              aria-label="Uppdatera"
+              title="Uppdatera">↻</button>
     </div>
   </div>
 
@@ -20,7 +24,6 @@
     />
   }
 
-  <!-- File list -->
   @if (loading()) {
     <p class="muted">Laddar...</p>
   } @else if (entries().length === 0) {
@@ -34,36 +37,18 @@
         @for (entry of entries(); track entry.name) {
           <div class="file-row">
             <span class="file-icon">{{ entry.file ? '📄' : '📁' }}</span>
-
             <span class="file-name">{{ entry.name }}</span>
-
             @if (entry.file) {
-              <span class="badge badge-accent" title="Antal versioner">
-                    v{{ entry.currentVersion }}
-                  </span>
+              <span class="badge badge-accent" title="Aktiv version">v{{ entry.currentVersion }}</span>
               <span class="file-meta">{{ formatBytes(entry.bytes) }}</span>
             }
-
             <span class="file-meta">{{ entry.changed }}</span>
-
-            <!-- Actions -->
             @if (entry.file) {
-              <button class="btn btn-ghost btn-sm"
-                      (click)="showVersions(entry)"
-                      title="Versioner">
-                Versioner
-              </button>
-              <a class="btn btn-ghost btn-sm"
-                 [href]="downloadUrl(entry.name)"
-                 [attr.download]="entry.name"
-                 title="Ladda ned">↓</a>
-              <button class="btn btn-ghost btn-sm btn-danger-hover"
-                      (click)="deleteFile(entry.name)"
-                      title="Ta bort fil">🗑</button>
+              <button class="btn btn-ghost btn-sm" (click)="showVersions(entry)" title="Versionshistorik">Versioner</button>
+              <a class="btn btn-ghost btn-sm" [href]="downloadUrl(entry.name)" [attr.download]="entry.name" title="Ladda ned">↓</a>
+              <button class="btn btn-ghost btn-sm btn-danger-hover" (click)="deleteFile(entry.name)" title="Ta bort">🗑</button>
             } @else {
-              <button class="btn btn-ghost btn-sm btn-danger-hover"
-                      (click)="deleteFolder(entry.name)"
-                      title="Ta bort mapp">🗑</button>
+              <button class="btn btn-ghost btn-sm btn-danger-hover" (click)="deleteFolder(entry.name)" title="Ta bort mapp">🗑</button>
             }
           </div>
         }
@@ -72,8 +57,11 @@
   }
 
   @if (actionMessage()) {
-    <p class="status-message" [class.status-success]="actionSuccess()" [class.status-error]="!actionSuccess()">
+    <p class="status-message"
+       [class.status-success]="actionSuccess()"
+       [class.status-error]="!actionSuccess()">
       {{ actionMessage() }}
     </p>
   }
+
 </div>
