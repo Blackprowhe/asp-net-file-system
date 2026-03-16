@@ -1,0 +1,26 @@
+﻿<nav class="nav-menu">
+  <!-- Root -->
+  <button class="nav-item" [class.active]="isActive('')" (click)="navigate('')">
+    <span class="nav-icon">🏠</span>
+    <span class="nav-label">Mina filer</span>
+  </button>
+
+  <!-- Rekursivt mappträd -->
+  <ng-container *ngTemplateOutlet="folderTree; context: { path: '', depth: 0 }" />
+
+  <ng-template #folderTree let-path="path" let-depth="depth">
+    @for (folder of childFolders(path); track folder.name) {
+      <button class="nav-item"
+              [class.active]="isActive(folder.name)"
+              [style.padding-left.px]="12 + depth * 16"
+              (click)="navigate(folder.name)">
+        <span class="nav-icon">{{ isExpanded(folder.name) ? '📂' : '📁' }}</span>
+        <span class="nav-label">{{ nav.shortName(folder.name) }}</span>
+      </button>
+      @if (isExpanded(folder.name)) {
+        <ng-container *ngTemplateOutlet="folderTree; context: { path: folder.name, depth: depth + 1 }" />
+      }
+    }
+  </ng-template>
+</nav>
+
