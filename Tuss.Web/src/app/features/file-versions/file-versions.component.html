@@ -1,0 +1,43 @@
+﻿<div class="card panel">
+  <div class="panel-header">
+    <h2 class="panel-title">Versioner — <span class="mono">{{ fileName() }}</span></h2>
+    <button class="btn btn-ghost btn-icon" (click)="closed.emit()" aria-label="Stäng">✕</button>
+  </div>
+
+  @if (loading()) {
+    <p class="muted">Laddar versioner...</p>
+  } @else if (versions().length === 0) {
+    <p class="muted">Inga versioner hittades.</p>
+  } @else {
+    <div class="file-list">
+      @for (v of versions(); track v.version) {
+        <div class="file-row">
+          <span class="file-icon">{{ v.isCurrent ? '●' : '○' }}</span>
+          <span class="file-name">
+                v{{ v.version }}
+            @if (v.isCurrent) { <span class="badge badge-accent">Aktiv</span> }
+              </span>
+          <span class="file-meta">{{ formatBytes(v.bytes) }}</span>
+          <span class="file-meta">{{ v.createdAt }}</span>
+          @if (!v.isCurrent) {
+            <button class="btn btn-secondary btn-sm" (click)="restore(v.version)" [disabled]="restoring()">
+              Återställ
+            </button>
+          }
+          <a class="btn btn-ghost btn-sm"
+             [href]="downloadUrl(v.version)"
+             target="_blank"
+             [attr.download]="fileName()">
+            ↓
+          </a>
+        </div>
+      }
+    </div>
+  }
+
+  @if (message()) {
+    <p class="status-message" [class.status-success]="success()" [class.status-error]="!success()">
+      {{ message() }}
+    </p>
+  }
+</div>
