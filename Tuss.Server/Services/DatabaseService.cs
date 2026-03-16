@@ -23,7 +23,7 @@ public class DatabaseService
         command.CommandText = """
             CREATE TABLE IF NOT EXISTS Files (
                 Name      TEXT NOT NULL PRIMARY KEY,
-                Content   TEXT NOT NULL DEFAULT '',
+                DiskPath  TEXT NOT NULL,
                 Created   TEXT NOT NULL,
                 Changed   TEXT NOT NULL,
                 IsFile    INTEGER NOT NULL DEFAULT 1,
