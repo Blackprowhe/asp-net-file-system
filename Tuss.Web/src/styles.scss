@@ -312,7 +312,8 @@ a:hover { color: var(--accent-hover); }
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  width: 88px;        /* 3 × 28px icon-btn — alltid samma bredd */
+  width: 96px;        /* clock(28) + download(28) + trash(28) + 2×gap(4) = 96px */
+  flex-shrink: 0;
   justify-content: flex-end;
   opacity: 0;
   transition: opacity 100ms ease-out;
