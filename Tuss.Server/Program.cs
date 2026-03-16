@@ -50,6 +50,11 @@ app.MapGet("/api/files", (DatabaseService db) =>
     return Results.Ok(result);
 });
 
+// GET /api/files/{filename} – hämta innehållet i en fil, 404 om den inte finns
+app.MapGet("/api/files/{filename}"), (string filename, DatabaseService db) =>
+{
+    
+};
 // POST /api/files/{*filename} – skapa en ny fil, 409 om den redan finns
 app.MapPost("/api/files/{*filename}", async (string filename, DatabaseService db, HttpContext context) =>
 {
@@ -82,6 +87,24 @@ app.MapPost("/api/files/{*filename}", async (string filename, DatabaseService db
         return Results.Conflict(); // Filen fanns redan
 
     return Results.Ok();
+});
+
+// HEAD /api/files/{filename} – kolla om en fil finns (200 eller 404)
+app.MapHead("/api/files/{filename}", (string filename, DatabaseService db) =>
+{
+    
+};
+
+// PUT /api/files/{filename} – uppdatera innehållet i en fil, 404 om den inte finns
+app.MapPut("/api/files/{filename}", async (string filename, DatabaseService db, HttpContext context) =>
+{
+    
+};
+
+// DELETE /api/files/{filename} – ta bort en fil, 404 om den inte finns
+app.MapDelete("/api/files/{filename}", (string filename, DatabaseService db) =>
+{
+    
 });
 
 app.Run();
