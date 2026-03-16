@@ -53,19 +53,16 @@ app.MapGet("/api/files/{*filename}", (string filename, FileRepository files, Htt
         return Results.NotFound();
 
     FileRepository.ApplyHeaders(context, file);
-    return Results.Text(file.Content, "text/plain");
+    return Results.Stream(files.OpenRead(file), "text/plain");
 });
 
 // POST /api/files/{*filename} – skapa en ny fil, 409 om den redan finns
 app.MapPost("/api/files/{*filename}", async (string filename, FileRepository files, HttpContext context) =>
 {
-    using var reader = new StreamReader(context.Request.Body);
-    var content = await reader.ReadToEndAsync();
-
-    return files.TryCreate(filename, content)
-        ? Results.Ok()
-        : Results.Conflict();
+    var created = await files.TryCreateAsync(filename, context.Request.Body);
+    return created ? Results.Ok() : Results.Conflict();
 });
+
 // HEAD /api/files/{*filename} – hämta metadata-headers utan body
 app.MapMethods("/api/files/{*filename}", ["HEAD"], (string filename, FileRepository files, HttpContext context) =>
 {
@@ -87,10 +84,7 @@ app.MapDelete("/api/files/{*filename}", (string filename, FileRepository files) 
 // PUT /api/files/{*filename} – skapa eller ersätt en fil, alltid 200
 app.MapPut("/api/files/{*filename}", async (string filename, FileRepository files, HttpContext context) =>
 {
-    using var reader = new StreamReader(context.Request.Body);
-    var content = await reader.ReadToEndAsync();
-
-    files.Upsert(filename, content);
+    await files.UpsertAsync(filename, context.Request.Body);
     return Results.Ok();
 });
 
