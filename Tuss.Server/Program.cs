@@ -53,8 +53,19 @@ app.MapGet("/api/files", (DatabaseService db) =>
 // GET /api/files/{filename} – hämta innehållet i en fil, 404 om den inte finns
 app.MapGet("/api/files/{filename}"), (string filename, DatabaseService db) =>
 {
-    
+    using var connection = db.CreateConnection();
+    var command = connection.CreateCommand();
+    command.CommandText = "SELECT Content FROM Files WHERE Name = $name";
+    command.Parameters.AddWithValue("$name", filename);
+
+    var content = command.ExecuteScalar() as string;
+
+    if (content == null)
+        return Results.NotFound(); // Filen finns inte
+
+    return Results.Ok(new { content });
 };
+
 // POST /api/files/{*filename} – skapa en ny fil, 409 om den redan finns
 app.MapPost("/api/files/{*filename}", async (string filename, DatabaseService db, HttpContext context) =>
 {
