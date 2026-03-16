@@ -50,4 +50,38 @@ app.MapGet("/api/files", (DatabaseService db) =>
     return Results.Ok(result);
 });
 
+// POST /api/files/{*filename} – skapa en ny fil, 409 om den redan finns
+app.MapPost("/api/files/{*filename}", async (string filename, DatabaseService db, HttpContext context) =>
+{
+    using var reader = new StreamReader(context.Request.Body);
+    var content = await reader.ReadToEndAsync();
+
+    var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+    var extension = Path.GetExtension(filename); // t.ex. ".md", ".txt"
+    var bytes = content.Length;
+
+    using var connection = db.CreateConnection();
+    var command = connection.CreateCommand();
+
+    // INSERT OR IGNORE lägger inte in raden om Name redan finns
+    // changes() returnerar hur många rader som faktiskt ändrades
+    command.CommandText = """
+        INSERT OR IGNORE INTO Files (Name, Content, Created, Changed, IsFile, Bytes, Extension)
+        VALUES ($name, $content, $now, $now, 1, $bytes, $extension);
+        SELECT changes();
+        """;
+    command.Parameters.AddWithValue("$name", filename);
+    command.Parameters.AddWithValue("$content", content);
+    command.Parameters.AddWithValue("$now", now);
+    command.Parameters.AddWithValue("$bytes", bytes);
+    command.Parameters.AddWithValue("$extension", extension);
+
+    var rowsChanged = (long)(command.ExecuteScalar() ?? 0L);
+
+    if (rowsChanged == 0)
+        return Results.Conflict(); // Filen fanns redan
+
+    return Results.Ok();
+});
+
 app.Run();
