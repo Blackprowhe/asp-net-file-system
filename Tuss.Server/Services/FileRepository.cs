@@ -6,10 +6,14 @@ namespace Tuss.Server.Services;
 public class FileRepository
 {
     private readonly DatabaseService _db;
+    private readonly string _storageRoot;
 
-    public FileRepository(DatabaseService db)
+    public FileRepository(DatabaseService db, IWebHostEnvironment env)
     {
         _db = db;
+        // Alla filer sparas under wwwroot/storage på disk
+        _storageRoot = Path.Combine(env.ContentRootPath, "storage");
+        Directory.CreateDirectory(_storageRoot);
     }
 
     // Sätter metadata-headers på responsen för en given fil
@@ -26,7 +30,7 @@ public class FileRepository
     private static StoredFile MapRow(SqliteDataReader reader) => new()
     {
         Name      = reader.GetString(0),
-        Content   = reader.GetString(1),
+        DiskPath  = reader.GetString(1),
         Created   = reader.GetString(2),
         Changed   = reader.GetString(3),
         IsFile    = reader.GetBoolean(4),
@@ -39,7 +43,7 @@ public class FileRepository
     {
         using var connection = _db.CreateConnection();
         var command = connection.CreateCommand();
-        command.CommandText = "SELECT Name, Content, Created, Changed, IsFile, Bytes, Extension FROM Files";
+        command.CommandText = "SELECT Name, DiskPath, Created, Changed, IsFile, Bytes, Extension FROM Files";
 
         var files = new List<StoredFile>();
         using var reader = command.ExecuteReader();
@@ -49,12 +53,12 @@ public class FileRepository
         return files;
     }
 
-    // Hämtar en specifik fil, eller null om den inte finns
+    // Hämtar metadata för en specifik fil, eller null om den inte finns
     public StoredFile? GetByName(string name)
     {
         using var connection = _db.CreateConnection();
         var command = connection.CreateCommand();
-        command.CommandText = "SELECT Name, Content, Created, Changed, IsFile, Bytes, Extension FROM Files WHERE Name = $name";
+        command.CommandText = "SELECT Name, DiskPath, Created, Changed, IsFile, Bytes, Extension FROM Files WHERE Name = $name";
         command.Parameters.AddWithValue("$name", name);
 
         using var reader = command.ExecuteReader();
@@ -159,4 +163,3 @@ public class FileRepository
         return Path.Combine(_storageRoot, safeName);
     }
 }
-
