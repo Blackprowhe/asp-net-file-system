@@ -68,28 +68,72 @@ public class FileRepository
     }
 
     // Försöker skapa en fil – returnerar false om den redan finns
-    // Skapar filen om den inte finns, ersätter innehållet om den redan finns
-    public void Upsert(string name, string content)
+    public async Task<bool> TryCreateAsync(string name, Stream body)
     {
-        var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+        var now       = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
         var extension = Path.GetExtension(name);
-        var bytes = content.Length;
+        var diskPath  = GetDiskPath(name);
+
+        // Kontrollera om filen redan finns i databasen innan vi skriver till disk
+        if (GetByName(name) is not null)
+            return false;
+
+        Directory.CreateDirectory(Path.GetDirectoryName(diskPath)!);
+        await using (var fs = File.Create(diskPath))
+            await body.CopyToAsync(fs);
+
+        var bytes = new FileInfo(diskPath).Length;
 
         using var connection = _db.CreateConnection();
         var command = connection.CreateCommand();
-
-        // INSERT OR REPLACE ersätter hela raden om Name redan finns
-        // Vi bevarar dock Created-värdet om filen redan existerar
         command.CommandText = """
-            INSERT INTO Files (Name, Content, Created, Changed, IsFile, Bytes, Extension)
-            VALUES ($name, $content, $now, $now, 1, $bytes, $extension)
+            INSERT OR IGNORE INTO Files (Name, DiskPath, Created, Changed, IsFile, Bytes, Extension)
+            VALUES ($name, $diskPath, $now, $now, 1, $bytes, $extension);
+            SELECT changes();
+            """;
+        command.Parameters.AddWithValue("$name", name);
+        command.Parameters.AddWithValue("$diskPath", diskPath);
+        command.Parameters.AddWithValue("$now", now);
+        command.Parameters.AddWithValue("$bytes", bytes);
+        command.Parameters.AddWithValue("$extension", extension);
+
+        var rowsChanged = (long)(command.ExecuteScalar() ?? 0L);
+
+        // Om raden inte lades in (race condition) – ta bort diskfilen igen
+        if (rowsChanged == 0)
+        {
+            File.Delete(diskPath);
+            return false;
+        }
+
+        return true;
+    }
+
+    // Skapar filen om den inte finns, ersätter innehållet om den redan finns
+    public async Task UpsertAsync(string name, Stream body)
+    {
+        var now       = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+        var extension = Path.GetExtension(name);
+        var diskPath  = GetDiskPath(name);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(diskPath)!);
+        await using (var fs = File.Create(diskPath))
+            await body.CopyToAsync(fs);
+
+        var bytes = new FileInfo(diskPath).Length;
+
+        using var connection = _db.CreateConnection();
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO Files (Name, DiskPath, Created, Changed, IsFile, Bytes, Extension)
+            VALUES ($name, $diskPath, $now, $now, 1, $bytes, $extension)
             ON CONFLICT(Name) DO UPDATE SET
-                Content   = $content,
+                DiskPath  = $diskPath,
                 Changed   = $now,
                 Bytes     = $bytes;
             """;
         command.Parameters.AddWithValue("$name", name);
-        command.Parameters.AddWithValue("$content", content);
+        command.Parameters.AddWithValue("$diskPath", diskPath);
         command.Parameters.AddWithValue("$now", now);
         command.Parameters.AddWithValue("$bytes", bytes);
         command.Parameters.AddWithValue("$extension", extension);
