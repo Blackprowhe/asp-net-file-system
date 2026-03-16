@@ -59,23 +59,19 @@ app.MapPost("/api/files/{*filename}", async (string filename, FileRepository fil
         ? Results.Ok()
         : Results.Conflict();
 });
-// HEAD /api/files/{filename} – kolla om en fil finns (200 eller 404)
-app.MapHead("/api/files/{filename}", (string filename, DatabaseService db) =>
+// HEAD /api/files/{*filename} – hämta metadata-headers utan body
+app.MapMethods("/api/files/{*filename}", ["HEAD"], (string filename, FileRepository files) =>
 {
-    
-};
-
-// PUT /api/files/{filename} – uppdatera innehållet i en fil, 404 om den inte finns
-app.MapPut("/api/files/{filename}", async (string filename, DatabaseService db, HttpContext context) =>
-{
-    
-};
-
-// DELETE /api/files/{filename} – ta bort en fil, 404 om den inte finns
-app.MapDelete("/api/files/{filename}", (string filename, DatabaseService db) =>
-{
-    
+    var file = files.GetByName(filename);
+    return file is null ? Results.NotFound() : Results.Ok();
 });
+
+// DELETE /api/files/{*filename} – ta bort en fil, alltid 200
+app.MapDelete("/api/files/{*filename}", (string filename, FileRepository files) =>
+{
+    return Results.Ok();
+});
+
 
 app.Run();
 

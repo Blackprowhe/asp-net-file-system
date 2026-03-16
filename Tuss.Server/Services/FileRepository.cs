@@ -51,6 +51,35 @@ public class FileRepository
         return reader.Read() ? MapRow(reader) : null;
     }
 
+    // Skapar filen om den inte finns, ersätter innehållet om den redan finns
+    public void Upsert(string name, string content)
+    {
+        var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+        var extension = Path.GetExtension(name);
+        var bytes = content.Length;
+
+        using var connection = _db.CreateConnection();
+        var command = connection.CreateCommand();
+
+        // INSERT OR REPLACE ersätter hela raden om Name redan finns
+        // Vi bevarar dock Created-värdet om filen redan existerar
+        command.CommandText = """
+            INSERT INTO Files (Name, Content, Created, Changed, IsFile, Bytes, Extension)
+            VALUES ($name, $content, $now, $now, 1, $bytes, $extension)
+            ON CONFLICT(Name) DO UPDATE SET
+                Content   = $content,
+                Changed   = $now,
+                Bytes     = $bytes;
+            """;
+        command.Parameters.AddWithValue("$name", name);
+        command.Parameters.AddWithValue("$content", content);
+        command.Parameters.AddWithValue("$now", now);
+        command.Parameters.AddWithValue("$bytes", bytes);
+        command.Parameters.AddWithValue("$extension", extension);
+
+        command.ExecuteNonQuery();
+    }
+
     // Försöker skapa en fil – returnerar false om den redan finns
     public bool TryCreate(string name, string content)
     {
