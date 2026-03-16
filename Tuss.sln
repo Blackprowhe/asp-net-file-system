@@ -1,11 +1,26 @@
-﻿
+﻿﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tuss.Client", "Tuss.Client\Tuss.Client.csproj", "{0E52BB46-F8E7-469B-B0FB-D1E959FC8434}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tuss.Server", "Tuss.Server\Tuss.Server.csproj", "{DEEF9BFF-4121-4614-B924-A063540AB50B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tuss.Web", "Tuss.Web", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+	ProjectSection(SolutionItems) = preProject
+		Tuss.Web\angular.json = Tuss.Web\angular.json
+		Tuss.Web\package.json = Tuss.Web\package.json
+		Tuss.Web\proxy.conf.json = Tuss.Web\proxy.conf.json
+		Tuss.Web\tsconfig.json = Tuss.Web\tsconfig.json
+		Tuss.Web\tsconfig.app.json = Tuss.Web\tsconfig.app.json
+		Tuss.Web\src\index.html = Tuss.Web\src\index.html
+		Tuss.Web\src\styles.scss = Tuss.Web\src\styles.scss
+		Tuss.Web\src\main.ts = Tuss.Web\src\main.ts
+		Tuss.Web\src\app\app.ts = Tuss.Web\src\app\app.ts
+		Tuss.Web\src\app\app.html = Tuss.Web\src\app\app.html
+		Tuss.Web\src\app\app.scss = Tuss.Web\src\app\app.scss
+		Tuss.Web\src\app\app.config.ts = Tuss.Web\src\app\app.config.ts
+		Tuss.Web\src\app\app.routes.ts = Tuss.Web\src\app\app.routes.ts
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -17,18 +32,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{0E52BB46-F8E7-469B-B0FB-D1E959FC8434}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0E52BB46-F8E7-469B-B0FB-D1E959FC8434}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0E52BB46-F8E7-469B-B0FB-D1E959FC8434}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{0E52BB46-F8E7-469B-B0FB-D1E959FC8434}.Debug|x64.Build.0 = Debug|Any CPU
-		{0E52BB46-F8E7-469B-B0FB-D1E959FC8434}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{0E52BB46-F8E7-469B-B0FB-D1E959FC8434}.Debug|x86.Build.0 = Debug|Any CPU
-		{0E52BB46-F8E7-469B-B0FB-D1E959FC8434}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0E52BB46-F8E7-469B-B0FB-D1E959FC8434}.Release|Any CPU.Build.0 = Release|Any CPU
-		{0E52BB46-F8E7-469B-B0FB-D1E959FC8434}.Release|x64.ActiveCfg = Release|Any CPU
-		{0E52BB46-F8E7-469B-B0FB-D1E959FC8434}.Release|x64.Build.0 = Release|Any CPU
-		{0E52BB46-F8E7-469B-B0FB-D1E959FC8434}.Release|x86.ActiveCfg = Release|Any CPU
-		{0E52BB46-F8E7-469B-B0FB-D1E959FC8434}.Release|x86.Build.0 = Release|Any CPU
 		{DEEF9BFF-4121-4614-B924-A063540AB50B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{DEEF9BFF-4121-4614-B924-A063540AB50B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DEEF9BFF-4121-4614-B924-A063540AB50B}.Debug|x64.ActiveCfg = Debug|Any CPU

@@ -6,8 +6,8 @@
   "scripts": {
     "generate": "node tests/generate.js",
     "test": "node tests/run.js",
-    "build:client": "powershell -NoProfile -Command \"$publish = '.\\.artifacts\\client-publish'; $target = '.\\Tuss.Server\\wwwroot'; Remove-Item -Path $publish -Recurse -Force -ErrorAction SilentlyContinue; dotnet publish '.\\Tuss.Client\\Tuss.Client.csproj' -c Release -o $publish; if (-not (Test-Path $target)) { New-Item -ItemType Directory -Path $target > $null }; Remove-Item -Path (Join-Path $target '*') -Recurse -Force -ErrorAction SilentlyContinue; Copy-Item -Path (Join-Path $publish 'wwwroot\\*') -Destination $target -Recurse -Force\"",
-    "build": "npm run build:client",
+    "build": "cd Tuss.Web && npm run build",
+    "dev": "cd Tuss.Web && npx ng serve --open",
     "start": "dotnet run --project .\\Tuss.Server\\Tuss.Server.csproj"
   },
   "keywords": [],

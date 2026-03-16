@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.StaticFiles;
 using Tuss.Server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,14 +29,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors(x => x.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 
 app.UseDefaultFiles();
-
-var staticFileContentTypeProvider = new FileExtensionContentTypeProvider();
-staticFileContentTypeProvider.Mappings[".dat"] = "application/octet-stream";
-
-app.UseStaticFiles(new StaticFileOptions
-{
-    ContentTypeProvider = staticFileContentTypeProvider
-});
+app.UseStaticFiles();
 
 // GET /api/files – hämta alla filer (utan innehåll)
 app.MapGet("/api/files", (FileRepository files) =>
@@ -99,8 +91,8 @@ app.MapPut("/api/files/{*filename}", async (string filename, FileRepository file
     return Results.Ok();
 });
 
-// SPA-fallback: skicka Blazor-index bara för klientrutter (ej API, ej statiska filer).
-app.MapFallback("{*path:nonfile}", async context =>
+// SPA-fallback: skicka index.html för Angular-klientrutter, men inte för /api.
+app.MapFallback(async context =>
 {
     if (context.Request.Path.StartsWithSegments("/api"))
     {
