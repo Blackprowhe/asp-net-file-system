@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { NavigationService } from '../../core/services/navigation.service';
+import { PlusIconComponent } from '../../shared/icons/icons';
 
 @Component({
   selector: 'app-folder-create',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PlusIconComponent],
   templateUrl: './folder-create.component.html',
 })
 export class FolderCreateComponent {

@@ -1,11 +1,12 @@
 ﻿import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NavigationService } from '../../core/services/navigation.service';
+import { HomeIconComponent, FolderIconComponent, FolderOpenIconComponent } from '../../shared/icons/icons';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, HomeIconComponent, FolderIconComponent, FolderOpenIconComponent],
   templateUrl: './sidebar.component.html',
 })
 export class SidebarComponent {
@@ -34,4 +35,3 @@ export class SidebarComponent {
     this.nav.navigateTo(path);
   }
 }
-

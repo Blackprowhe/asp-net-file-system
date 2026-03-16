@@ -2,11 +2,20 @@
 import { CommonModule } from '@angular/common';
 import { FileVersion } from '../../core/models/file.model';
 import { ApiService } from '../../core/services/api.service';
+import { FileSizePipe } from '../../shared/pipes/file-size.pipe';
+import {
+  DotFilledIconComponent, CircleIconComponent, CrossIconComponent,
+  DownloadIconComponent, ResetIconComponent,
+} from '../../shared/icons/icons';
 
 @Component({
   selector: 'app-file-versions',
   standalone: true,
-  imports: [CommonModule],
+  imports: [
+    CommonModule, FileSizePipe,
+    DotFilledIconComponent, CircleIconComponent, CrossIconComponent,
+    DownloadIconComponent, ResetIconComponent,
+  ],
   templateUrl: './file-versions.component.html',
 })
 export class FileVersionsComponent {
@@ -42,11 +51,5 @@ export class FileVersionsComponent {
         this.restoring.set(false);
       },
     });
-  }
-
-  formatBytes(b: number): string {
-    if (b < 1024) return `${b} B`;
-    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
-    return `${(b / (1024 * 1024)).toFixed(1)} MB`;
   }
 }

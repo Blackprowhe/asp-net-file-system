@@ -4,11 +4,22 @@ import { ApiService } from '../../core/services/api.service';
 import { NavigationService } from '../../core/services/navigation.service';
 import { StoredFile, FileVersion } from '../../core/models/file.model';
 import { FileVersionsComponent } from '../file-versions/file-versions.component';
+import { FileSizePipe } from '../../shared/pipes/file-size.pipe';
+import {
+  FileIconComponent, FolderIconComponent, ChevronRightIconComponent,
+  ClockIconComponent, DownloadIconComponent, TrashIconComponent,
+  ResetIconComponent,
+} from '../../shared/icons/icons';
 
 @Component({
   selector: 'app-file-browser',
   standalone: true,
-  imports: [CommonModule, FileVersionsComponent],
+  imports: [
+    CommonModule, FileVersionsComponent, FileSizePipe,
+    FileIconComponent, FolderIconComponent, ChevronRightIconComponent,
+    ClockIconComponent, DownloadIconComponent, TrashIconComponent,
+    ResetIconComponent,
+  ],
   templateUrl: './file-browser.component.html',
 })
 export class FileBrowserComponent implements OnInit {
@@ -16,7 +27,6 @@ export class FileBrowserComponent implements OnInit {
   nav = inject(NavigationService);
 
   loading = signal(false);
-
   versionsFor = signal<string | null>(null);
   currentVersions = signal<FileVersion[]>([]);
   actionMessage = signal('');
@@ -115,12 +125,6 @@ export class FileBrowserComponent implements OnInit {
   private setAction(msg: string, ok: boolean) {
     this.actionMessage.set(msg);
     this.actionSuccess.set(ok);
-  }
-
-  formatBytes(b: number): string {
-    if (b < 1024) return `${b} B`;
-    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
-    return `${(b / (1024 * 1024)).toFixed(1)} MB`;
   }
 }
 

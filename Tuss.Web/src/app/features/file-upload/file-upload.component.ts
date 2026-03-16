@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { NavigationService } from '../../core/services/navigation.service';
+import { UploadIconComponent } from '../../shared/icons/icons';
 
 @Component({
   selector: 'app-file-upload',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, UploadIconComponent],
   templateUrl: './file-upload.component.html',
 })
 export class FileUploadComponent {
