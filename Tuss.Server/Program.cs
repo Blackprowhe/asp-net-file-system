@@ -79,6 +79,15 @@ app.MapDelete("/api/files/{*filename}", (string filename, FileRepository files) 
     return Results.Ok();
 });
 
+// PUT /api/files/{*filename} – skapa eller ersätt en fil, alltid 200
+app.MapPut("/api/files/{*filename}", async (string filename, FileRepository files, HttpContext context) =>
+{
+    using var reader = new StreamReader(context.Request.Body);
+    var content = await reader.ReadToEndAsync();
+
+    files.Upsert(filename, content);
+    return Results.Ok();
+});
 
 app.Run();
 
