@@ -65,13 +65,13 @@ export class ApiService {
     );
   }
 
-  // ── Mappar ────────────────────────────────────────────────────────────────
+  // ── Mappar (POST utan body = mapp) ─────────────────────────────────────
 
   createFolder(path: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/folders/${encodePath(path)}`, null);
+    return this.http.post<void>(`${this.base}/files/${encodePath(path)}`, null);
   }
 
   deleteFolder(path: string): Observable<void> {
-    return this.http.delete<void>(`${this.base}/folders/${encodePath(path)}`);
+    return this.http.delete<void>(`${this.base}/files/${encodePath(path)}`);
   }
 }
