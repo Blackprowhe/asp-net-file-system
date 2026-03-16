@@ -1,7 +1,7 @@
 ﻿<nav class="nav-menu">
   <!-- Root -->
   <button class="nav-item" [class.active]="isActive('')" (click)="navigate('')">
-    <span class="nav-icon">🏠</span>
+    <span class="nav-icon"><icon-home [size]="15" /></span>
     <span class="nav-label">Mina filer</span>
   </button>
 
@@ -14,7 +14,13 @@
               [class.active]="isActive(folder.name)"
               [style.padding-left.px]="12 + depth * 16"
               (click)="navigate(folder.name)">
-        <span class="nav-icon">{{ isExpanded(folder.name) ? '📂' : '📁' }}</span>
+        <span class="nav-icon">
+          @if (isExpanded(folder.name)) {
+            <icon-folder-open [size]="15" />
+          } @else {
+            <icon-folder [size]="15" />
+          }
+        </span>
         <span class="nav-label">{{ nav.shortName(folder.name) }}</span>
       </button>
       @if (isExpanded(folder.name)) {
@@ -23,4 +29,3 @@
     }
   </ng-template>
 </nav>
-
