@@ -1,0 +1,16 @@
+﻿@page "/demo"
+@inject HttpClient Http
+
+<h3>@message</h3>
+
+@code {
+string message = "Laddar...";
+
+protected override async Task OnInitializedAsync()
+{
+var result = await Http.GetFromJsonAsync<MessageResponse>("/api/hello");
+message = result?.Message ?? "Inget svar";
+}
+
+record MessageResponse(string Message);
+}
