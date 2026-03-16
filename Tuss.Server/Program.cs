@@ -2,6 +2,11 @@ using Tuss.Server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 1_000_000_000; // 1 GB
+});
+
 builder.Services.AddOpenApi();
 builder.Services.AddCors();
 
