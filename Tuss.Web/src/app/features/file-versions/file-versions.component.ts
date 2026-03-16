@@ -23,7 +23,8 @@ export class FileVersionsComponent {
   success = signal(false);
 
   downloadUrl(version: number): string {
-    return `/api/files/${encodeURIComponent(this.fileName())}/versions/${version}`;
+    const encoded = this.fileName().split('/').map(encodeURIComponent).join('/');
+    return `/api/files/${encoded}/versions/${version}`;
   }
 
   restore(version: number) {
