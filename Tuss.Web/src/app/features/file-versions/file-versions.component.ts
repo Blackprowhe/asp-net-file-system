@@ -17,7 +17,6 @@ export class FileVersionsComponent {
   closed = output<void>();
   restored = output<void>();
 
-  loading = signal(false);
   restoring = signal(false);
   message = signal('');
   success = signal(false);
@@ -33,7 +32,7 @@ export class FileVersionsComponent {
     this.api.restoreVersion(this.fileName(), version).subscribe({
       next: () => {
         this.success.set(true);
-        this.message.set(`✓ Återställd till v${version}`);
+        this.message.set(`Återställd till v${version}`);
         this.restoring.set(false);
         this.restored.emit();
       },
@@ -51,4 +50,3 @@ export class FileVersionsComponent {
     return `${(b / (1024 * 1024)).toFixed(1)} MB`;
   }
 }
-

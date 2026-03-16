@@ -19,7 +19,6 @@ export class FileBrowserComponent implements OnInit {
 
   versionsFor = signal<string | null>(null);
   currentVersions = signal<FileVersion[]>([]);
-
   actionMessage = signal('');
   actionSuccess = signal(false);
 
@@ -92,10 +91,7 @@ export class FileBrowserComponent implements OnInit {
     if (!confirm(`Ta bort "${this.nav.shortName(name)}" och alla versioner?`)) return;
     this.api.deleteFile(name).subscribe({
       next: () => {
-        this.setAction(`✓ "${this.nav.shortName(name)}" borttagen`, true);
-        if (this.versionsFor() === name) this.closeVersions();
-        this.load();
-      },
+      next: () => { this.setAction(`"${this.nav.shortName(name)}" borttagen`, true); if (this.versionsFor() === name) this.closeVersions(); this.load(); },
       error: (e) => this.setAction(`Fel: ${e.status}`, false),
     });
   }
