@@ -1,7 +1,33 @@
-<div class="empty-state">
-  <h2>☁ {{ title }}</h2>
-  <p>Angular-projektet funkar! Dags att bygga vidare.</p>
-  <button class="btn btn-primary">Kom igång</button>
-</div>
+<div class="shell">
 
-<router-outlet />
+  <header class="topbar">
+    <span class="topbar-brand">☁ Tuss</span>
+  </header>
+
+  <div class="shell-body">
+
+    <aside class="sidebar">
+      <nav class="nav-menu">
+        <a class="nav-item active">
+          <span class="nav-icon">📁</span>
+          <span class="nav-label">Mina filer</span>
+        </a>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+
+      <!-- Åtgärdspaneler -->
+      <div class="action-panels">
+        <app-file-upload (uploadDone)="browser.load()" />
+        <app-folder-create (folderCreated)="browser.load()" />
+      </div>
+
+      <!-- Fillistan -->
+      <app-file-browser #browser />
+
+    </main>
+
+  </div>
+
+</div>

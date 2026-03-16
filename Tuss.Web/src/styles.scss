@@ -202,6 +202,70 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 
 .mono { font-family: var(--font-mono); }
 
+// ── Panel ──────────────────────────────────────────────────────────────────
+.panel {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.panel-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+// ── Input row ──────────────────────────────────────────────────────────────
+.input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+// ── Small button ──────────────────────────────────────────────────────────
+.btn-sm {
+  height: 28px;
+  font-size: var(--text-xs);
+  padding: 0 var(--space-3);
+}
+
+// Danger hover variant on ghost buttons
+.btn-danger-hover:hover {
+  color: var(--danger);
+  background: var(--danger-subtle);
+}
+
+// ── Muted text ────────────────────────────────────────────────────────────
+.muted {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  padding: var(--space-4);
+}
+
+// ── Browser section ────────────────────────────────────────────────────────
+.browser-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

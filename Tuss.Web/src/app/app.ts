@@ -1,9 +1,12 @@
 import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { FileBrowserComponent } from './features/file-browser/file-browser.component';
+import { FileUploadComponent } from './features/file-upload/file-upload.component';
+import { FolderCreateComponent } from './features/folder-create/folder-create.component';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
+  standalone: true,
+  imports: [FileBrowserComponent, FileUploadComponent, FolderCreateComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
