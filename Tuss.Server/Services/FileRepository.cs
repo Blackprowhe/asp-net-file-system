@@ -148,11 +148,17 @@ public class FileRepository
     // Tar bort en fil – gör ingenting om den inte finns
     public void Delete(string name)
     {
+        var file = GetByName(name);
+
         using var connection = _db.CreateConnection();
         var command = connection.CreateCommand();
         command.CommandText = "DELETE FROM Files WHERE Name = $name";
         command.Parameters.AddWithValue("$name", name);
         command.ExecuteNonQuery();
+
+        // Ta bort diskfilen om den fanns
+        if (file is not null && File.Exists(file.DiskPath))
+            File.Delete(file.DiskPath);
     }
 
     // Bygger en unik diskväg för en fil baserat på dess namn
