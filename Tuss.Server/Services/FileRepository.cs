@@ -80,6 +80,16 @@ public class FileRepository
         command.ExecuteNonQuery();
     }
 
+    // Tar bort en fil – gör ingenting om den inte finns
+    public void Delete(string name)
+    {
+        using var connection = _db.CreateConnection();
+        var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM Files WHERE Name = $name";
+        command.Parameters.AddWithValue("$name", name);
+        command.ExecuteNonQuery();
+    }
+
     // Försöker skapa en fil – returnerar false om den redan finns
     public bool TryCreate(string name, string content)
     {

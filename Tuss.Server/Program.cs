@@ -5,6 +5,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddCors();
 
+
 // Registrera databasen som en singleton – samma instans används överallt
 var dbPath = Path.Combine(builder.Environment.ContentRootPath, "tuss.db");
 builder.Services.AddSingleton(new DatabaseService(dbPath));
@@ -69,6 +70,7 @@ app.MapMethods("/api/files/{*filename}", ["HEAD"], (string filename, FileReposit
 // DELETE /api/files/{*filename} – ta bort en fil, alltid 200
 app.MapDelete("/api/files/{*filename}", (string filename, FileRepository files) =>
 {
+    files.Delete(filename);
     return Results.Ok();
 });
 
