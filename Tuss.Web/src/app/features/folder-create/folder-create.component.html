@@ -1,14 +1,17 @@
 ﻿<div class="card panel">
   <h2 class="panel-title">Ny mapp</h2>
   <div class="input-row">
-    <input class="input-field"
-           [(ngModel)]="folderPath"
-           placeholder="t.ex. projekt/bilder"
+    @if (pathPrefix) {
+      <span class="mono file-meta">{{ pathPrefix }}</span>
+    }
+    <input class="input-field" style="flex:1"
+           [(ngModel)]="folderName"
+           placeholder="mappnamn"
            (keyup.enter)="create()" />
     <button class="btn btn-secondary"
             (click)="create()"
-            [disabled]="!folderPath.trim() || loading()">
-      Skapa mapp
+            [disabled]="!folderName.trim() || loading()">
+      Skapa
     </button>
   </div>
   @if (message()) {
@@ -19,4 +22,3 @@
     </p>
   }
 </div>
-

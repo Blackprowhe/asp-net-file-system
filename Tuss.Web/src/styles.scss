@@ -183,9 +183,33 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 .status-info { background: var(--accent-subtle); color: var(--accent); }
 
 /* === Breadcrumbs === */
-.breadcrumbs { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--text-tertiary); padding-bottom: var(--space-4); }
-.breadcrumbs a { color: var(--text-secondary); }
-.breadcrumbs a:hover { color: var(--accent); }
+.breadcrumbs { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--text-tertiary); padding-bottom: var(--space-4); flex-wrap: wrap; }
+.breadcrumb-link { color: var(--text-secondary); cursor: pointer; }
+.breadcrumb-link:hover { color: var(--accent); text-decoration: underline; }
+.breadcrumb-current { color: var(--text-primary); font-weight: 500; }
+.breadcrumb-sep { color: var(--text-tertiary); user-select: none; }
+
+/* === Nav menu (sidebar) === */
+.nav-menu { display: flex; flex-direction: column; gap: 1px; padding: var(--space-2) 0; }
+.nav-item {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 400;
+  color: var(--text-secondary);
+  background: transparent; border: none; cursor: pointer;
+  text-align: left; width: 100%;
+  border-radius: var(--radius-sm);
+  transition: background-color 100ms ease-out;
+}
+.nav-item:hover { background: var(--bg-elevated); color: var(--text-primary); }
+.nav-item.active { background: var(--accent-subtle); color: var(--accent); font-weight: 500; }
+.nav-icon { font-size: var(--text-base); flex-shrink: 0; width: 20px; text-align: center; }
+.nav-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* === File row clickable variant === */
+.file-row-clickable { cursor: pointer; }
+.file-row-clickable .file-name { color: var(--accent); }
+.file-row-clickable:hover .file-name { text-decoration: underline; }
 
 /* === Toolbar === */
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-bottom: var(--space-4); }

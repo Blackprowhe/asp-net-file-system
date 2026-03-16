@@ -36,10 +36,11 @@
   flex-shrink: 0;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
-  padding: var(--space-4) 0;
+  padding: var(--space-2) 0;
   height: calc(100vh - 48px);
   position: sticky;
   top: 48px;
+  overflow-y: auto;
 
   @media (max-width: 768px) {
     display: none;

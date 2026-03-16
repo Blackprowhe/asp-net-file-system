@@ -7,10 +7,15 @@
 
   @if (selectedFile()) {
     <div class="input-group">
-      <label class="input-label">Sökväg på servern</label>
-      <input class="input-field"
-             [(ngModel)]="targetName"
-             placeholder="t.ex. projekt/README.md" />
+      <label class="input-label">Filnamn</label>
+      <div class="input-row">
+        @if (pathPrefix) {
+          <span class="mono file-meta">{{ pathPrefix }}</span>
+        }
+        <input class="input-field" style="flex:1"
+               [(ngModel)]="targetName"
+               placeholder="filnamn.txt" />
+      </div>
     </div>
 
     <div class="input-row">
