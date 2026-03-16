@@ -300,10 +300,20 @@ a:hover { color: var(--accent-hover); }
   color: var(--text-tertiary);
   white-space: nowrap;
 }
+.file-meta-size {
+  width: 64px;
+  text-align: right;
+}
+.file-meta-date {
+  width: 140px;
+  text-align: right;
+}
 .file-actions {
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  width: 88px;        /* 3 × 28px icon-btn — alltid samma bredd */
+  justify-content: flex-end;
   opacity: 0;
   transition: opacity 100ms ease-out;
 }

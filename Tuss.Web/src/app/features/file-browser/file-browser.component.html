@@ -52,10 +52,10 @@
 
             <span class="file-name">{{ nav.shortName(entry.name) }}</span>
 
-            @if (entry.file) {
-              <span class="file-meta">{{ entry.bytes | fileSize }}</span>
-            }
-            <span class="file-meta">{{ entry.changed }}</span>
+            <span class="file-meta file-meta-size">
+              @if (entry.file) { {{ entry.bytes | fileSize }} }
+            </span>
+            <span class="file-meta file-meta-date">{{ entry.changed }}</span>
 
             <span class="file-actions" (click)="$event.stopPropagation()">
               @if (entry.file) {
