@@ -61,6 +61,13 @@ public class FileRepository
         return reader.Read() ? MapRow(reader) : null;
     }
 
+    // Öppnar en läsström till filens innehåll på disk
+    public Stream OpenRead(StoredFile file)
+    {
+        return File.OpenRead(file.DiskPath);
+    }
+
+    // Försöker skapa en fil – returnerar false om den redan finns
     // Skapar filen om den inte finns, ersätter innehållet om den redan finns
     public void Upsert(string name, string content)
     {
@@ -100,28 +107,12 @@ public class FileRepository
         command.ExecuteNonQuery();
     }
 
-    // Försöker skapa en fil – returnerar false om den redan finns
-    public bool TryCreate(string name, string content)
+    // Bygger en unik diskväg för en fil baserat på dess namn
+    private string GetDiskPath(string name)
     {
-        var now = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
-        var extension = Path.GetExtension(name);
-        var bytes = content.Length;
-
-        using var connection = _db.CreateConnection();
-        var command = connection.CreateCommand();
-        command.CommandText = """
-            INSERT OR IGNORE INTO Files (Name, Content, Created, Changed, IsFile, Bytes, Extension)
-            VALUES ($name, $content, $now, $now, 1, $bytes, $extension);
-            SELECT changes();
-            """;
-        command.Parameters.AddWithValue("$name", name);
-        command.Parameters.AddWithValue("$content", content);
-        command.Parameters.AddWithValue("$now", now);
-        command.Parameters.AddWithValue("$bytes", bytes);
-        command.Parameters.AddWithValue("$extension", extension);
-
-        var rowsChanged = (long)(command.ExecuteScalar() ?? 0L);
-        return rowsChanged > 0;
+        // Ersätt / med _ för att hålla allt platt på disk
+        var safeName = name.Replace("/", "_").Replace("\\", "_");
+        return Path.Combine(_storageRoot, safeName);
     }
 }
 
