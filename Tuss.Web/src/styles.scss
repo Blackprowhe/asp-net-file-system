@@ -103,12 +103,12 @@
 /* === Mörkt läge — via OS === */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg-canvas:      #141412;
-    --bg-surface:     #1C1A18;
-    --bg-elevated:    #252320;
+    --bg-canvas:      #0E0E0E;
+    --bg-surface:     #141414;
+    --bg-elevated:    #1C1C1C;
 
-    --border:         rgba(240,235,225,0.10);
-    --border-subtle:  rgba(240,235,225,0.06);
+    --border:         rgba(255,255,255,0.09);
+    --border-subtle:  rgba(255,255,255,0.05);
 
     --accent:         #C8C4BC;
     --accent-hover:   #E0DBD3;
