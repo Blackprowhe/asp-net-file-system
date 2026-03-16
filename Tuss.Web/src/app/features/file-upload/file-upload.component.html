@@ -1,5 +1,5 @@
 ﻿<div class="card panel">
-  <h2 class="panel-title">Ladda upp fil</h2>
+  <h2 class="panel-title"><icon-upload [size]="15" /> Ladda upp fil</h2>
 
   <div class="input-row">
     <input type="file" #fileInput (change)="onFileChange(fileInput.files)" />
@@ -21,15 +21,13 @@
     <div class="input-row">
       <button class="btn btn-primary"
               (click)="upload('post')"
-              [disabled]="!targetName.trim() || loading()"
-              title="Skapar ny fil, 409 om den redan finns">
-        POST — ny fil
+              [disabled]="!targetName.trim() || loading()">
+        Skapa ny fil
       </button>
       <button class="btn btn-secondary"
               (click)="upload('put')"
-              [disabled]="!targetName.trim() || loading()"
-              title="Skapar ny version, skapar filen om den inte finns">
-        PUT — ny version
+              [disabled]="!targetName.trim() || loading()">
+        Ny version
       </button>
       <button class="btn btn-ghost" (click)="clear()">Avbryt</button>
     </div>
