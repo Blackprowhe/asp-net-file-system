@@ -8,8 +8,18 @@ import { FileSizePipe } from '../../shared/pipes/file-size.pipe';
 import {
   FileIconComponent, FolderIconComponent, ChevronRightIconComponent,
   ClockIconComponent, DownloadIconComponent, TrashIconComponent,
-  ResetIconComponent,
+  ResetIconComponent, ImageIconComponent, VideoIconComponent,
+  CodeIconComponent, TextIconComponent, ArchiveIconComponent, EyeIconComponent,
+  CrossIconComponent,
 } from '../../shared/icons/icons';
+
+const IMAGE_EXTS  = new Set(['.jpg','.jpeg','.png','.gif','.webp','.svg','.avif','.bmp']);
+const VIDEO_EXTS  = new Set(['.mp4','.webm','.mov','.avi','.mkv']);
+const CODE_EXTS   = new Set(['.ts','.js','.cs','.html','.css','.scss','.json','.xml','.yaml','.yml','.py','.go','.rs','.java','.cpp','.c','.h','.sh','.md']);
+const TEXT_EXTS   = new Set(['.txt','.log','.csv','.env','.ini','.cfg']);
+const ARCHIVE_EXTS= new Set(['.zip','.tar','.gz','.rar','.7z','.bz2']);
+
+type IconType = 'image'|'video'|'code'|'text'|'archive'|'file';
 
 @Component({
   selector: 'app-file-browser',
@@ -18,9 +28,12 @@ import {
     CommonModule, FileVersionsComponent, FileSizePipe,
     FileIconComponent, FolderIconComponent, ChevronRightIconComponent,
     ClockIconComponent, DownloadIconComponent, TrashIconComponent,
-    ResetIconComponent,
+    ResetIconComponent, ImageIconComponent, VideoIconComponent,
+    CodeIconComponent, TextIconComponent, ArchiveIconComponent, EyeIconComponent,
+    CrossIconComponent,
   ],
   templateUrl: './file-browser.component.html',
+  styleUrl: './file-browser.component.scss',
 })
 export class FileBrowserComponent implements OnInit {
   private api = inject(ApiService);
@@ -31,6 +44,13 @@ export class FileBrowserComponent implements OnInit {
   currentVersions = signal<FileVersion[]>([]);
   actionMessage = signal('');
   actionSuccess = signal(false);
+
+  // Drag & drop
+  isDragOver = signal(false);
+
+  // Bildförhandsvisning
+  previewUrl = signal<string | null>(null);
+  previewName = signal('');
 
   ngOnInit() { this.load(); }
 
@@ -47,7 +67,6 @@ export class FileBrowserComponent implements OnInit {
     });
   }
 
-  /** Plattar ut det nästlade trädet till en flat lista med fulla sökvägar */
   private flattenEntries(map: Record<string, any>, prefix: string, out: StoredFile[]) {
     for (const [key, meta] of Object.entries(map)) {
       const fullName = prefix ? `${prefix}/${key}` : key;
@@ -61,12 +80,74 @@ export class FileBrowserComponent implements OnInit {
     }
   }
 
+  // ── Icon helper ──────────────────────────────────────────────────────────
+  iconType(entry: StoredFile): IconType {
+    if (!entry.file) return 'file';
+    const ext = (entry.extension ?? '').toLowerCase();
+    if (IMAGE_EXTS.has(ext))   return 'image';
+    if (VIDEO_EXTS.has(ext))   return 'video';
+    if (CODE_EXTS.has(ext))    return 'code';
+    if (TEXT_EXTS.has(ext))    return 'text';
+    if (ARCHIVE_EXTS.has(ext)) return 'archive';
+    return 'file';
+  }
+
+  isImage(entry: StoredFile): boolean {
+    return IMAGE_EXTS.has((entry.extension ?? '').toLowerCase());
+  }
+
+  // ── Navigation ───────────────────────────────────────────────────────────
   navigateToFolder(entry: StoredFile) { this.nav.navigateTo(entry.name); }
 
   downloadUrl(name: string): string {
     return `/api/files/${name.split('/').map(encodeURIComponent).join('/')}`;
   }
 
+  // ── Preview ──────────────────────────────────────────────────────────────
+  openPreview(entry: StoredFile) {
+    this.previewUrl.set(this.downloadUrl(entry.name));
+    this.previewName.set(this.nav.shortName(entry.name));
+  }
+
+  closePreview() {
+    this.previewUrl.set(null);
+    this.previewName.set('');
+  }
+
+  // ── Drag & drop ──────────────────────────────────────────────────────────
+  onDragOver(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.isDragOver.set(true);
+  }
+
+  onDragLeave(e: DragEvent) {
+    e.preventDefault();
+    this.isDragOver.set(false);
+  }
+
+  onDrop(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.isDragOver.set(false);
+    const files = e.dataTransfer?.files;
+    if (!files?.length) return;
+    const prefix = this.nav.currentPath() ? this.nav.currentPath() + '/' : '';
+    Array.from(files).forEach(file => {
+      const fullPath = prefix + file.name;
+      this.api.uploadFile(fullPath, file).subscribe({
+        next: () => this.load(),
+        error: (err) => {
+          if (err.status === 409) {
+            // Finns redan — gör PUT (ny version)
+            this.api.replaceFile(fullPath, file).subscribe({ next: () => this.load() });
+          }
+        },
+      });
+    });
+  }
+
+  // ── Versions ─────────────────────────────────────────────────────────────
   showVersions(entry: StoredFile) {
     this.versionsFor.set(entry.name);
     this.currentVersions.set([]);
@@ -82,6 +163,7 @@ export class FileBrowserComponent implements OnInit {
     }
   }
 
+  // ── Delete ────────────────────────────────────────────────────────────────
   deleteFile(name: string) {
     if (!confirm(`Ta bort "${this.nav.shortName(name)}"?`)) return;
     this.api.deleteFile(name).subscribe({
