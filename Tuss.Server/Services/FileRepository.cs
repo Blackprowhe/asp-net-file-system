@@ -12,6 +12,16 @@ public class FileRepository
         _db = db;
     }
 
+    // Sätter metadata-headers på responsen för en given fil
+    public static void ApplyHeaders(HttpContext context, StoredFile file)
+    {
+        context.Response.Headers["X-Created-At"] = file.Created;
+        context.Response.Headers["X-Changed-At"] = file.Changed;
+        context.Response.Headers["X-Type"]       = "file";
+        context.Response.Headers["X-Bytes"]      = file.Bytes.ToString();
+        context.Response.Headers["X-Extension"]  = file.Extension;
+    }
+
     // Läser en rad från reader och mappar den till ett StoredFile-objekt
     private static StoredFile MapRow(SqliteDataReader reader) => new()
     {

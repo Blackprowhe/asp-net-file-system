@@ -41,12 +41,13 @@ app.MapGet("/api/files", (FileRepository files) =>
 });
 
 // GET /api/files/{*filename} – hämta innehållet i en fil, 404 om den inte finns
-app.MapGet("/api/files/{*filename}", (string filename, FileRepository files) =>
+app.MapGet("/api/files/{*filename}", (string filename, FileRepository files, HttpContext context) =>
 {
     var file = files.GetByName(filename);
     if (file is null)
         return Results.NotFound();
 
+    FileRepository.ApplyHeaders(context, file);
     return Results.Text(file.Content, "text/plain");
 });
 
@@ -61,10 +62,14 @@ app.MapPost("/api/files/{*filename}", async (string filename, FileRepository fil
         : Results.Conflict();
 });
 // HEAD /api/files/{*filename} – hämta metadata-headers utan body
-app.MapMethods("/api/files/{*filename}", ["HEAD"], (string filename, FileRepository files) =>
+app.MapMethods("/api/files/{*filename}", ["HEAD"], (string filename, FileRepository files, HttpContext context) =>
 {
     var file = files.GetByName(filename);
-    return file is null ? Results.NotFound() : Results.Ok();
+    if (file is null)
+        return Results.NotFound();
+
+    FileRepository.ApplyHeaders(context, file);
+    return Results.Ok();
 });
 
 // DELETE /api/files/{*filename} – ta bort en fil, alltid 200
