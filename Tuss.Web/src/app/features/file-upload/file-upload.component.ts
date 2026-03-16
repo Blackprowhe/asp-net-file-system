@@ -2,6 +2,7 @@
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
+import { NavigationService } from '../../core/services/navigation.service';
 
 @Component({
   selector: 'app-file-upload',
@@ -11,6 +12,7 @@ import { ApiService } from '../../core/services/api.service';
 })
 export class FileUploadComponent {
   private api = inject(ApiService);
+  private nav = inject(NavigationService);
 
   uploadDone = output<void>();
 
@@ -19,6 +21,12 @@ export class FileUploadComponent {
   loading = signal(false);
   message = signal('');
   success = signal(false);
+
+  /** Visar aktuell mapp som prefix i UI */
+  get pathPrefix(): string {
+    const p = this.nav.currentPath();
+    return p ? p + '/' : '';
+  }
 
   onFileChange(files: FileList | null) {
     const f = files?.[0] ?? null;
@@ -32,12 +40,13 @@ export class FileUploadComponent {
     const name = this.targetName.trim();
     if (!file || !name) return;
 
+    const fullPath = this.pathPrefix + name;
     this.loading.set(true);
     this.message.set('');
 
     const call = method === 'post'
-      ? this.api.uploadFile(name, file)
-      : this.api.replaceFile(name, file);
+      ? this.api.uploadFile(fullPath, file)
+      : this.api.replaceFile(fullPath, file);
 
     call.subscribe({
       next: () => {
@@ -60,4 +69,3 @@ export class FileUploadComponent {
     this.targetName = '';
   }
 }
-
