@@ -4,8 +4,8 @@
   <div class="breadcrumbs">
     @for (crumb of nav.breadcrumbs(); track crumb.path; let last = $last) {
       @if (!last) {
-        <a (click)="nav.navigateTo(crumb.path)" class="breadcrumb-link">{{ crumb.label }}</a>
-        <span class="breadcrumb-sep">/</span>
+        <button class="breadcrumb-link" (click)="nav.navigateTo(crumb.path)">{{ crumb.label }}</button>
+        <span class="breadcrumb-sep"><icon-chevron-right [size]="15" /></span>
       } @else {
         <span class="breadcrumb-current">{{ crumb.label }}</span>
       }
@@ -15,10 +15,12 @@
             (click)="load()"
             [disabled]="loading()"
             aria-label="Uppdatera"
-            title="Uppdatera">↻</button>
+            title="Uppdatera">
+      <icon-reset [size]="15" />
+    </button>
   </div>
 
-  <!-- Versions panel -->
+  <!-- Versions drawer -->
   @if (versionsFor()) {
     <app-file-versions
       [fileName]="versionsFor()!"
@@ -32,8 +34,8 @@
     <p class="muted">Laddar...</p>
   } @else if (nav.currentEntries().length === 0) {
     <div class="empty-state">
-      <h2>Tom mapp</h2>
-      <p>Ladda upp en fil eller skapa en undermapp.</p>
+      <h2 class="font-serif">Inga filer här ännu</h2>
+      <p>Ladda upp din första fil eller skapa en ny mapp.</p>
     </div>
   } @else {
     <div class="card">
@@ -43,21 +45,36 @@
                [class.file-row-clickable]="!entry.file"
                (click)="!entry.file ? navigateToFolder(entry) : null">
 
-            <span class="file-icon">{{ entry.file ? '📄' : '📁' }}</span>
+            <span class="file-icon">
+              @if (entry.file) { <icon-file [size]="15" /> }
+              @else { <icon-folder [size]="15" /> }
+            </span>
+
             <span class="file-name">{{ nav.shortName(entry.name) }}</span>
 
             @if (entry.file) {
-              <span class="file-meta">{{ formatBytes(entry.bytes) }}</span>
+              <span class="file-meta">{{ entry.bytes | fileSize }}</span>
             }
             <span class="file-meta">{{ entry.changed }}</span>
 
-            @if (entry.file) {
-              <button class="btn btn-ghost btn-sm" (click)="showVersions(entry); $event.stopPropagation()" title="Versionshistorik">Versioner</button>
-              <a class="btn btn-ghost btn-sm" [href]="downloadUrl(entry.name)" [attr.download]="nav.shortName(entry.name)" title="Ladda ned" (click)="$event.stopPropagation()">↓</a>
-              <button class="btn btn-ghost btn-sm btn-danger-hover" (click)="deleteFile(entry.name); $event.stopPropagation()" title="Ta bort">🗑</button>
-            } @else {
-              <button class="btn btn-ghost btn-sm btn-danger-hover" (click)="deleteFolder(entry.name); $event.stopPropagation()" title="Ta bort mapp">🗑</button>
-            }
+            <span class="file-actions" (click)="$event.stopPropagation()">
+              @if (entry.file) {
+                <button class="btn btn-ghost btn-icon btn-sm" (click)="showVersions(entry)" title="Versioner">
+                  <icon-clock [size]="15" />
+                </button>
+                <a class="btn btn-ghost btn-icon btn-sm" [href]="downloadUrl(entry.name)" [attr.download]="nav.shortName(entry.name)" title="Ladda ned">
+                  <icon-download [size]="15" />
+                </a>
+                <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--danger)" (click)="deleteFile(entry.name)" title="Ta bort">
+                  <icon-trash [size]="15" />
+                </button>
+              } @else {
+                <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--danger)" (click)="deleteFolder(entry.name)" title="Ta bort mapp">
+                  <icon-trash [size]="15" />
+                </button>
+              }
+            </span>
+
           </div>
         }
       </div>
