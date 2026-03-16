@@ -1,6 +1,7 @@
 ﻿import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
+import { NavigationService } from '../../core/services/navigation.service';
 import { StoredFile, FileVersion } from '../../core/models/file.model';
 import { FileVersionsComponent } from '../file-versions/file-versions.component';
 
@@ -12,13 +13,12 @@ import { FileVersionsComponent } from '../file-versions/file-versions.component'
 })
 export class FileBrowserComponent implements OnInit {
   private api = inject(ApiService);
+  nav = inject(NavigationService);
 
-  entries = signal<StoredFile[]>([]);
   loading = signal(false);
 
   versionsFor = signal<string | null>(null);
   currentVersions = signal<FileVersion[]>([]);
-  versionsLoading = signal(false);
 
   actionMessage = signal('');
   actionSuccess = signal(false);
@@ -33,8 +33,7 @@ export class FileBrowserComponent implements OnInit {
       next: (map) => {
         const flat: StoredFile[] = [];
         this.flattenEntries(map, '', flat);
-        flat.sort((a, b) => Number(a.file) - Number(b.file) || a.name.localeCompare(b.name));
-        this.entries.set(flat);
+        this.nav.allEntries.set(flat);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
@@ -57,6 +56,10 @@ export class FileBrowserComponent implements OnInit {
         this.flattenEntries(meta.content, fullName, out);
       }
     }
+  }
+
+  navigateToFolder(entry: StoredFile) {
+    this.nav.navigateTo(entry.name);
   }
 
   downloadUrl(name: string): string {
@@ -86,10 +89,10 @@ export class FileBrowserComponent implements OnInit {
   }
 
   deleteFile(name: string) {
-    if (!confirm(`Ta bort "${name}" och alla versioner?`)) return;
+    if (!confirm(`Ta bort "${this.nav.shortName(name)}" och alla versioner?`)) return;
     this.api.deleteFile(name).subscribe({
       next: () => {
-        this.setAction(`✓ "${name}" borttagen`, true);
+        this.setAction(`✓ "${this.nav.shortName(name)}" borttagen`, true);
         if (this.versionsFor() === name) this.closeVersions();
         this.load();
       },
@@ -98,11 +101,15 @@ export class FileBrowserComponent implements OnInit {
   }
 
   deleteFolder(name: string) {
-    if (!confirm(`Ta bort mappen "${name}" och allt innehåll?`)) return;
-    // Strip trailing slash for the API call
-    this.api.deleteFolder(name.replace(/\/$/, '')).subscribe({
+    if (!confirm(`Ta bort mappen "${this.nav.shortName(name)}" och allt innehåll?`)) return;
+    this.api.deleteFolder(name).subscribe({
       next: () => {
-        this.setAction(`✓ Mappen "${name}" borttagen`, true);
+        this.setAction(`✓ Mappen "${this.nav.shortName(name)}" borttagen`, true);
+        // Om vi stod i den borttagna mappen, gå till parent
+        if (this.nav.currentPath() === name || this.nav.currentPath().startsWith(name + '/')) {
+          const parentIdx = name.lastIndexOf('/');
+          this.nav.navigateTo(parentIdx === -1 ? '' : name.slice(0, parentIdx));
+        }
         this.load();
       },
       error: (e) => this.setAction(`Fel: ${e.status}`, false),
