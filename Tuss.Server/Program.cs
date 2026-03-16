@@ -31,71 +31,144 @@ app.UseCors(x => x.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-// ─── Filer ───────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-// GET /api/files – lista alla filer och mappar
+// Bygger svarsobjektet för en fil
+static object FileToDto(Tuss.Server.Models.StoredFile f) => new
+{
+    created   = f.Created,
+    changed   = f.Changed,
+    file      = f.IsFile,
+    bytes     = f.Bytes,
+    extension = f.Extension,
+};
+
+// Bygger nästlat träd av mappar med "content"-property som specen kräver
+static object FolderToDto(Tuss.Server.Models.StoredFile folder, FileRepository files)
+{
+    var children = files.GetDirectChildren(folder.Name);
+    var content = new Dictionary<string, object>();
+    var prefix  = folder.Name + "/";
+    foreach (var child in children)
+    {
+        var shortName = child.Name[prefix.Length..];
+        content[shortName] = child.IsFile
+            ? FileToDto(child)
+            : FolderToDto(child, files);
+    }
+    return new
+    {
+        created = folder.Created,
+        changed = folder.Changed,
+        file    = false,
+        bytes   = files.GetFolderSize(folder.Name),
+        content,
+    };
+}
+
+// Avgör om requesten har body-innehåll
+static bool HasBody(HttpContext ctx) =>
+    ctx.Request.ContentLength is > 0
+    || ctx.Request.Headers.ContentType.Count > 0;
+
+// ─── GET /api/files ──────────────────────────────────────────────────────────
+
+// Hämtar alla filer och mappar. Mappar på root-nivå visas med nästlat "content".
 app.MapGet("/api/files", (FileRepository files) =>
 {
-    var result = files.GetAll().ToDictionary(
-        f => f.Name,
-        f => (object)new
-        {
-            created        = f.Created,
-            changed        = f.Changed,
-            file           = f.IsFile,
-            bytes          = f.Bytes,
-            extension      = f.Extension,
-            currentVersion = f.CurrentVersion ?? 1,
-        }
-    );
+    var all = files.GetAll();
+    // Bara top-level poster (inget "/" i namn)
+    var result = new Dictionary<string, object>();
+    foreach (var f in all)
+    {
+        if (f.Name.Contains('/')) continue; // barn av en mapp, visas via content
+        result[f.Name] = f.IsFile ? FileToDto(f) : FolderToDto(f, files);
+    }
     return Results.Ok(result);
 });
 
-// GET /api/files/{*filename} – hämta innehållet i aktiv version
-app.MapGet("/api/files/{*filename}", (string filename, FileRepository files, HttpContext context) =>
-{
-    var file = files.GetByName(filename);
-    if (file is null) return Results.NotFound();
-    if (!file.IsFile) return Results.BadRequest("Det är en mapp, inte en fil.");
+// ─── GET /api/files/{*path} ──────────────────────────────────────────────────
 
-    FileRepository.ApplyHeaders(context, file);
-    return Results.Stream(files.OpenRead(file), "application/octet-stream");
+// Om det är en fil → returnera innehållet.
+// Om det är en mapp → returnera direkta barn som JSON.
+app.MapGet("/api/files/{*path}", (string path, FileRepository files, HttpContext context) =>
+{
+    var entry = files.GetByName(path);
+    if (entry is null) return Results.NotFound();
+
+    if (entry.IsFile)
+    {
+        FileRepository.ApplyHeaders(context, entry);
+        return Results.Stream(files.OpenRead(entry), "application/octet-stream");
+    }
+
+    // Mapp → returnera direkta barn med korta namn
+    var children = files.GetDirectChildren(path);
+    var result = new Dictionary<string, object>();
+    var prefix = path + "/";
+    foreach (var child in children)
+    {
+        var shortName = child.Name[prefix.Length..];
+        result[shortName] = child.IsFile
+            ? FileToDto(child)
+            : FolderToDto(child, files);
+    }
+    return Results.Ok(result);
 });
 
-// POST /api/files/{*filename} – skapa ny fil (version 1), 409 om den redan finns
-app.MapPost("/api/files/{*filename}", async (string filename, FileRepository files, HttpContext context) =>
+// ─── POST /api/files/{*path} ─────────────────────────────────────────────────
+
+// Utan body → skapa mapp (409 om den redan finns).
+// Med body  → skapa fil (409 om den redan finns).
+app.MapPost("/api/files/{*path}", async (string path, FileRepository files, HttpContext context) =>
 {
-    var created = await files.TryCreateAsync(filename, context.Request.Body);
-    return created ? Results.Ok() : Results.Conflict();
+    if (!HasBody(context))
+    {
+        var created = files.CreateFolder(path);
+        return created ? Results.Ok() : Results.Conflict();
+    }
+
+    var fileCreated = await files.TryCreateAsync(path, context.Request.Body);
+    return fileCreated ? Results.Ok() : Results.Conflict();
 });
 
-// PUT /api/files/{*filename} – ladda upp ny version (skapar filen om den inte finns)
-app.MapPut("/api/files/{*filename}", async (string filename, FileRepository files, HttpContext context) =>
+// ─── PUT /api/files/{*path} ──────────────────────────────────────────────────
+
+// Utan body → skapa/uppdatera mapp.
+// Med body  → skapa/uppdatera fil (ny version).
+app.MapPut("/api/files/{*path}", async (string path, FileRepository files, HttpContext context) =>
 {
-    await files.UpsertAsync(filename, context.Request.Body);
+    if (!HasBody(context))
+    {
+        files.UpsertFolder(path);
+        return Results.Ok();
+    }
+
+    await files.UpsertAsync(path, context.Request.Body);
     return Results.Ok();
 });
 
-// HEAD /api/files/{*filename} – metadata-headers utan body
-app.MapMethods("/api/files/{*filename}", ["HEAD"], (string filename, FileRepository files, HttpContext context) =>
+// ─── HEAD /api/files/{*path} ─────────────────────────────────────────────────
+
+app.MapMethods("/api/files/{*path}", ["HEAD"], (string path, FileRepository files, HttpContext context) =>
 {
-    var file = files.GetByName(filename);
-    if (file is null) return Results.NotFound();
-    FileRepository.ApplyHeaders(context, file);
+    var entry = files.GetByName(path);
+    if (entry is null) return Results.NotFound();
+    FileRepository.ApplyHeaders(context, entry);
     return Results.Ok();
 });
 
-// DELETE /api/files/{*filename} – ta bort fil och alla versioner
-app.MapDelete("/api/files/{*filename}", (string filename, FileRepository files) =>
+// ─── DELETE /api/files/{*path} ───────────────────────────────────────────────
+
+// Tar bort fil eller mapp (och allt under den). Alltid 200.
+app.MapDelete("/api/files/{*path}", (string path, FileRepository files) =>
 {
-    files.Delete(filename);
+    files.DeleteEntry(path);
     return Results.Ok();
 });
 
-// ─── Versioner ────────────────────────────────────────────────────────────────
+// ─── Versioner ───────────────────────────────────────────────────────────────
 
-// GET /api/files/{filename}/versions – lista alla versioner för en fil
-// OBS: {filename} är URL-enkodad, t.ex. "projekt%2FREADME.md" för "projekt/README.md"
 app.MapGet("/api/files/{filename}/versions", (string filename, FileRepository files) =>
 {
     filename = Uri.UnescapeDataString(filename);
@@ -112,7 +185,6 @@ app.MapGet("/api/files/{filename}/versions", (string filename, FileRepository fi
     return Results.Ok(versions);
 });
 
-// GET /api/files/{filename}/versions/{version} – hämta en specifik version
 app.MapGet("/api/files/{filename}/versions/{version:int}", (string filename, int version, FileRepository files) =>
 {
     filename = Uri.UnescapeDataString(filename);
@@ -121,7 +193,6 @@ app.MapGet("/api/files/{filename}/versions/{version:int}", (string filename, int
     return Results.Stream(File.OpenRead(fileVersion.DiskPath), "application/octet-stream");
 });
 
-// POST /api/files/{filename}/versions/{version}/restore – återställ till en version
 app.MapPost("/api/files/{filename}/versions/{version:int}/restore", async (string filename, int version, FileRepository files) =>
 {
     filename = Uri.UnescapeDataString(filename);
@@ -131,44 +202,8 @@ app.MapPost("/api/files/{filename}/versions/{version:int}/restore", async (strin
     return Results.Ok();
 });
 
-// ─── Mappar ───────────────────────────────────────────────────────────────────
+// ─── SPA fallback ────────────────────────────────────────────────────────────
 
-// POST /api/folders/{*path} – skapa mapp (och föräldersmappar), 409 om den finns
-app.MapPost("/api/folders/{*path}", (string path, FileRepository files) =>
-{
-    var created = files.CreateFolder(path);
-    return created ? Results.Ok() : Results.Conflict();
-});
-
-// DELETE /api/folders/{*path} – ta bort mapp och allt innehåll
-app.MapDelete("/api/folders/{*path}", (string path, FileRepository files) =>
-{
-    files.DeleteFolder(path);
-    return Results.Ok();
-});
-
-// GET /api/folders/{*path} – lista innehållet i en specifik mapp
-app.MapGet("/api/folders/{*path}", (string path, FileRepository files) =>
-{
-    var folder = files.GetByName(path.Trim('/') + "/");
-    if (folder is null) return Results.NotFound();
-
-    var contents = files.GetByFolder(path).ToDictionary(
-        f => f.Name,
-        f => (object)new
-        {
-            created        = f.Created,
-            changed        = f.Changed,
-            file           = f.IsFile,
-            bytes          = f.Bytes,
-            extension      = f.Extension,
-            currentVersion = f.CurrentVersion ?? 1,
-        }
-    );
-    return Results.Ok(contents);
-});
-
-// SPA-fallback: skicka index.html för Angular-klientrutter, men inte för /api.
 app.MapFallback(async context =>
 {
     if (context.Request.Path.StartsWithSegments("/api"))
