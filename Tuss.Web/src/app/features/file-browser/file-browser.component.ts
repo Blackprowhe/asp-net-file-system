@@ -49,7 +49,7 @@ export class FileBrowserComponent implements OnInit {
   }
 
   downloadUrl(name: string): string {
-    return `/api/files/${encodeURIComponent(name)}`;
+    return `/api/files/${name.split('/').map(encodeURIComponent).join('/')}`;
   }
 
   showVersions(entry: StoredFile) {
