@@ -9,7 +9,7 @@ import {
   FileIconComponent, FolderIconComponent, ChevronRightIconComponent,
   ClockIconComponent, DownloadIconComponent, TrashIconComponent,
   ResetIconComponent, ImageIconComponent, VideoIconComponent,
-  CodeIconComponent, TextIconComponent, ArchiveIconComponent, EyeIconComponent,
+  CodeIconComponent, TextIconComponent, ArchiveIconComponent,
   CrossIconComponent,
 } from '../../shared/icons/icons';
 
@@ -107,6 +107,13 @@ export class FileBrowserComponent implements OnInit {
   openPreview(entry: StoredFile) {
     this.previewUrl.set(this.downloadUrl(entry.name));
     this.previewName.set(this.nav.shortName(entry.name));
+  }
+
+  onFileNameClick(entry: StoredFile, event: MouseEvent) {
+    if (this.isImage(entry)) {
+      event.stopPropagation();
+      this.openPreview(entry);
+    }
   }
 
   closePreview() {
