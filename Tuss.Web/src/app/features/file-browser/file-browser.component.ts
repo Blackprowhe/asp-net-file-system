@@ -32,9 +32,7 @@ export class FileBrowserComponent implements OnInit {
   actionMessage = signal('');
   actionSuccess = signal(false);
 
-  ngOnInit() {
-    this.load();
-  }
+  ngOnInit() { this.load(); }
 
   load() {
     this.loading.set(true);
@@ -54,12 +52,8 @@ export class FileBrowserComponent implements OnInit {
     for (const [key, meta] of Object.entries(map)) {
       const fullName = prefix ? `${prefix}/${key}` : key;
       out.push({
-        name: fullName,
-        created: meta.created,
-        changed: meta.changed,
-        file: meta.file,
-        bytes: meta.bytes,
-        extension: meta.extension,
+        name: fullName, created: meta.created, changed: meta.changed,
+        file: meta.file, bytes: meta.bytes, extension: meta.extension,
       });
       if (!meta.file && meta.content) {
         this.flattenEntries(meta.content, fullName, out);
@@ -67,9 +61,7 @@ export class FileBrowserComponent implements OnInit {
     }
   }
 
-  navigateToFolder(entry: StoredFile) {
-    this.nav.navigateTo(entry.name);
-  }
+  navigateToFolder(entry: StoredFile) { this.nav.navigateTo(entry.name); }
 
   downloadUrl(name: string): string {
     return `/api/files/${name.split('/').map(encodeURIComponent).join('/')}`;
@@ -78,22 +70,15 @@ export class FileBrowserComponent implements OnInit {
   showVersions(entry: StoredFile) {
     this.versionsFor.set(entry.name);
     this.currentVersions.set([]);
-    this.api.getVersions(entry.name).subscribe({
-      next: (v) => this.currentVersions.set(v),
-    });
+    this.api.getVersions(entry.name).subscribe({ next: (v) => this.currentVersions.set(v) });
   }
 
-  closeVersions() {
-    this.versionsFor.set(null);
-    this.currentVersions.set([]);
-  }
+  closeVersions() { this.versionsFor.set(null); this.currentVersions.set([]); }
 
   onRestored() {
     this.load();
     if (this.versionsFor()) {
-      this.api.getVersions(this.versionsFor()!).subscribe({
-        next: (v) => this.currentVersions.set(v),
-      });
+      this.api.getVersions(this.versionsFor()!).subscribe({ next: (v) => this.currentVersions.set(v) });
     }
   }
 
@@ -127,4 +112,3 @@ export class FileBrowserComponent implements OnInit {
     this.actionSuccess.set(ok);
   }
 }
-
