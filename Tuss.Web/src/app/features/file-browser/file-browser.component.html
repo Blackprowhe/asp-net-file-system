@@ -1,17 +1,21 @@
-﻿﻿<div class="browser-section">
+﻿<div class="browser-section">
 
-  <!-- Toolbar -->
-  <div class="toolbar">
-    <div class="toolbar-left">
-      <span class="section-title">Mina filer</span>
-    </div>
-    <div class="toolbar-right">
-      <button class="btn btn-ghost btn-icon"
-              (click)="load()"
-              [disabled]="loading()"
-              aria-label="Uppdatera"
-              title="Uppdatera">↻</button>
-    </div>
+  <!-- Breadcrumbs -->
+  <div class="breadcrumbs">
+    @for (crumb of nav.breadcrumbs(); track crumb.path; let last = $last) {
+      @if (!last) {
+        <a (click)="nav.navigateTo(crumb.path)" class="breadcrumb-link">{{ crumb.label }}</a>
+        <span class="breadcrumb-sep">/</span>
+      } @else {
+        <span class="breadcrumb-current">{{ crumb.label }}</span>
+      }
+    }
+    <div style="flex:1"></div>
+    <button class="btn btn-ghost btn-icon btn-sm"
+            (click)="load()"
+            [disabled]="loading()"
+            aria-label="Uppdatera"
+            title="Uppdatera">↻</button>
   </div>
 
   <!-- Versions panel -->
@@ -26,28 +30,33 @@
 
   @if (loading()) {
     <p class="muted">Laddar...</p>
-  } @else if (entries().length === 0) {
+  } @else if (nav.currentEntries().length === 0) {
     <div class="empty-state">
-      <h2>Inga filer ännu</h2>
-      <p>Ladda upp en fil eller skapa en mapp ovan.</p>
+      <h2>Tom mapp</h2>
+      <p>Ladda upp en fil eller skapa en undermapp.</p>
     </div>
   } @else {
     <div class="card">
       <div class="file-list">
-        @for (entry of entries(); track entry.name) {
-          <div class="file-row">
+        @for (entry of nav.currentEntries(); track entry.name) {
+          <div class="file-row"
+               [class.file-row-clickable]="!entry.file"
+               (click)="!entry.file ? navigateToFolder(entry) : null">
+
             <span class="file-icon">{{ entry.file ? '📄' : '📁' }}</span>
-            <span class="file-name">{{ entry.name }}</span>
+            <span class="file-name">{{ nav.shortName(entry.name) }}</span>
+
             @if (entry.file) {
               <span class="file-meta">{{ formatBytes(entry.bytes) }}</span>
             }
             <span class="file-meta">{{ entry.changed }}</span>
+
             @if (entry.file) {
-              <button class="btn btn-ghost btn-sm" (click)="showVersions(entry)" title="Versionshistorik">Versioner</button>
-              <a class="btn btn-ghost btn-sm" [href]="downloadUrl(entry.name)" [attr.download]="entry.name" title="Ladda ned">↓</a>
-              <button class="btn btn-ghost btn-sm btn-danger-hover" (click)="deleteFile(entry.name)" title="Ta bort">🗑</button>
+              <button class="btn btn-ghost btn-sm" (click)="showVersions(entry); $event.stopPropagation()" title="Versionshistorik">Versioner</button>
+              <a class="btn btn-ghost btn-sm" [href]="downloadUrl(entry.name)" [attr.download]="nav.shortName(entry.name)" title="Ladda ned" (click)="$event.stopPropagation()">↓</a>
+              <button class="btn btn-ghost btn-sm btn-danger-hover" (click)="deleteFile(entry.name); $event.stopPropagation()" title="Ta bort">🗑</button>
             } @else {
-              <button class="btn btn-ghost btn-sm btn-danger-hover" (click)="deleteFolder(entry.name)" title="Ta bort mapp">🗑</button>
+              <button class="btn btn-ghost btn-sm btn-danger-hover" (click)="deleteFolder(entry.name); $event.stopPropagation()" title="Ta bort mapp">🗑</button>
             }
           </div>
         }
