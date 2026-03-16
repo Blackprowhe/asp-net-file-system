@@ -4,8 +4,8 @@
   changed: string;
   file: boolean;
   bytes: number;
-  extension: string;
-  currentVersion: number;
+  extension?: string;
+  content?: FileMap;
 }
 
 export interface FileVersion {
@@ -15,5 +15,4 @@ export interface FileVersion {
   isCurrent: boolean;
 }
 
-export type FileMap = Record<string, StoredFile>;
-
+export type FileMap = Record<string, Omit<StoredFile, 'name'>>;
