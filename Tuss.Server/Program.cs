@@ -24,4 +24,30 @@ app.UseCors(x => x.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 
 app.MapGet("/api/hello", () => Results.Ok(new { message = "Hej från API!" }));
 
+// GET /api/files – hämta alla filer (utan innehåll)
+app.MapGet("/api/files", (DatabaseService db) =>
+{
+    using var connection = db.CreateConnection();
+    var command = connection.CreateCommand();
+    command.CommandText = "SELECT Name, Created, Changed, IsFile, Bytes, Extension FROM Files";
+
+    var result = new Dictionary<string, object>();
+
+    using var reader = command.ExecuteReader();
+    while (reader.Read())
+    {
+        var name = reader.GetString(0);
+        result[name] = new
+        {
+            created = reader.GetString(1),
+            changed = reader.GetString(2),
+            file = reader.GetBoolean(3),
+            bytes = reader.GetInt64(4),
+            extension = reader.GetString(5)
+        };
+    }
+
+    return Results.Ok(result);
+});
+
 app.Run();
