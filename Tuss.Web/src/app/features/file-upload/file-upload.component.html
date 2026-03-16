@@ -1,0 +1,32 @@
+﻿<div class="card panel">
+  <h2 class="panel-title">Ladda upp fil</h2>
+
+  <div class="input-row">
+    <input type="file" #fileInput (change)="onFileChange(fileInput.files)" />
+  </div>
+
+  @if (selectedFile()) {
+    <div class="input-row" style="margin-top: var(--space-3)">
+      <div class="input-group" style="flex:1">
+        <label class="input-label">Sökväg på servern</label>
+        <input class="input-field" [(ngModel)]="targetName" placeholder="t.ex. projekt/README.md" />
+      </div>
+    </div>
+
+    <div class="input-row" style="margin-top: var(--space-3)">
+      <button class="btn btn-primary" (click)="upload('post')" [disabled]="!targetName.trim() || loading()">
+        POST (ny fil)
+      </button>
+      <button class="btn btn-secondary" (click)="upload('put')" [disabled]="!targetName.trim() || loading()">
+        PUT (ny version)
+      </button>
+      <button class="btn btn-ghost" (click)="clear()">Avbryt</button>
+    </div>
+  }
+
+  @if (message()) {
+    <p class="status-message" [class.status-success]="success()" [class.status-error]="!success()">
+      {{ message() }}
+    </p>
+  }
+</div>

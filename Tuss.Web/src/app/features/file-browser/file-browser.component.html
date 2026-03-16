@@ -1,0 +1,79 @@
+﻿<div class="browser-section">
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <span class="section-title">Mina filer</span>
+    </div>
+    <div class="toolbar-right">
+      <button class="btn btn-ghost btn-icon" (click)="load()" [disabled]="loading()" aria-label="Uppdatera" title="Uppdatera">↻</button>
+    </div>
+  </div>
+
+  <!-- Versions panel -->
+  @if (versionsFor()) {
+    <app-file-versions
+      [fileName]="versionsFor()!"
+      [versions]="currentVersions()"
+      (closed)="closeVersions()"
+      (restored)="onRestored()"
+    />
+  }
+
+  <!-- File list -->
+  @if (loading()) {
+    <p class="muted">Laddar...</p>
+  } @else if (entries().length === 0) {
+    <div class="empty-state">
+      <h2>Inga filer ännu</h2>
+      <p>Ladda upp en fil eller skapa en mapp ovan.</p>
+    </div>
+  } @else {
+    <div class="card">
+      <div class="file-list">
+        @for (entry of entries(); track entry.name) {
+          <div class="file-row">
+            <span class="file-icon">{{ entry.file ? '📄' : '📁' }}</span>
+
+            <span class="file-name">{{ entry.name }}</span>
+
+            @if (entry.file) {
+              <span class="badge badge-accent" title="Antal versioner">
+                    v{{ entry.currentVersion }}
+                  </span>
+              <span class="file-meta">{{ formatBytes(entry.bytes) }}</span>
+            }
+
+            <span class="file-meta">{{ entry.changed }}</span>
+
+            <!-- Actions -->
+            @if (entry.file) {
+              <button class="btn btn-ghost btn-sm"
+                      (click)="showVersions(entry)"
+                      title="Versioner">
+                Versioner
+              </button>
+              <a class="btn btn-ghost btn-sm"
+                 [href]="downloadUrl(entry.name)"
+                 [attr.download]="entry.name"
+                 title="Ladda ned">↓</a>
+              <button class="btn btn-ghost btn-sm btn-danger-hover"
+                      (click)="deleteFile(entry.name)"
+                      title="Ta bort fil">🗑</button>
+            } @else {
+              <button class="btn btn-ghost btn-sm btn-danger-hover"
+                      (click)="deleteFolder(entry.name)"
+                      title="Ta bort mapp">🗑</button>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (actionMessage()) {
+    <p class="status-message" [class.status-success]="actionSuccess()" [class.status-error]="!actionSuccess()">
+      {{ actionMessage() }}
+    </p>
+  }
+</div>
