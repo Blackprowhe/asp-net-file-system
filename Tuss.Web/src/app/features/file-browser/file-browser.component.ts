@@ -83,9 +83,8 @@ export class FileBrowserComponent implements OnInit {
   }
 
   deleteFile(name: string) {
-    if (!confirm(`Ta bort "${this.nav.shortName(name)}" och alla versioner?`)) return;
+    if (!confirm(`Ta bort "${this.nav.shortName(name)}"?`)) return;
     this.api.deleteFile(name).subscribe({
-      next: () => {
       next: () => { this.setAction(`"${this.nav.shortName(name)}" borttagen`, true); if (this.versionsFor() === name) this.closeVersions(); this.load(); },
       error: (e) => this.setAction(`Fel: ${e.status}`, false),
     });
@@ -95,11 +94,10 @@ export class FileBrowserComponent implements OnInit {
     if (!confirm(`Ta bort mappen "${this.nav.shortName(name)}" och allt innehåll?`)) return;
     this.api.deleteFolder(name).subscribe({
       next: () => {
-        this.setAction(`✓ Mappen "${this.nav.shortName(name)}" borttagen`, true);
-        // Om vi stod i den borttagna mappen, gå till parent
+        this.setAction(`Mappen "${this.nav.shortName(name)}" borttagen`, true);
         if (this.nav.currentPath() === name || this.nav.currentPath().startsWith(name + '/')) {
-          const parentIdx = name.lastIndexOf('/');
-          this.nav.navigateTo(parentIdx === -1 ? '' : name.slice(0, parentIdx));
+          const idx = name.lastIndexOf('/');
+          this.nav.navigateTo(idx === -1 ? '' : name.slice(0, idx));
         }
         this.load();
       },
