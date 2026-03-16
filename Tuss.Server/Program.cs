@@ -28,6 +28,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors(x => x.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 // GET /api/files – hämta alla filer (utan innehåll)
 app.MapGet("/api/files", (FileRepository files) =>
 {
