@@ -311,14 +311,32 @@ a:hover { color: var(--accent-hover); }
 .file-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
-  width: 96px;        /* clock(28) + download(28) + trash(28) + 2×gap(4) = 96px */
+  gap: var(--space-1);  /* 4px */
+  width: 124px;         /* 4 slots × 28px + 3 gaps × 4px = 124px */
   flex-shrink: 0;
   justify-content: flex-end;
   opacity: 0;
   transition: opacity 100ms ease-out;
 }
 .file-row:hover .file-actions { opacity: 1; }
+
+/* Osynlig platshållare — håller slot-positionen */
+.action-spacer {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.action-danger { color: var(--danger); }
+.action-danger:hover { color: var(--danger); background: var(--danger-subtle); }
+
+/* Klickbart filnamn för bilder */
+.file-name-link {
+  cursor: pointer;
+  color: var(--accent);
+}
+.file-name-link:hover { text-decoration: underline; }
 
 /* Clickable folder rows */
 .file-row-clickable { cursor: pointer; }
