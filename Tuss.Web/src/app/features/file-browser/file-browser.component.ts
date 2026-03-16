@@ -31,21 +31,32 @@ export class FileBrowserComponent implements OnInit {
     this.loading.set(true);
     this.api.getFiles().subscribe({
       next: (map) => {
-        this.entries.set(
-          Object.entries(map).map(([name, meta]) => ({
-            name,
-            created: meta.created,
-            changed: meta.changed,
-            file: meta.file,
-            bytes: meta.bytes,
-            extension: meta.extension,
-            currentVersion: meta.currentVersion,
-          })).sort((a, b) => Number(a.file) - Number(b.file) || a.name.localeCompare(b.name))
-        );
+        const flat: StoredFile[] = [];
+        this.flattenEntries(map, '', flat);
+        flat.sort((a, b) => Number(a.file) - Number(b.file) || a.name.localeCompare(b.name));
+        this.entries.set(flat);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
     });
+  }
+
+  /** Plattar ut det nästlade trädet till en flat lista med fulla sökvägar */
+  private flattenEntries(map: Record<string, any>, prefix: string, out: StoredFile[]) {
+    for (const [key, meta] of Object.entries(map)) {
+      const fullName = prefix ? `${prefix}/${key}` : key;
+      out.push({
+        name: fullName,
+        created: meta.created,
+        changed: meta.changed,
+        file: meta.file,
+        bytes: meta.bytes,
+        extension: meta.extension,
+      });
+      if (!meta.file && meta.content) {
+        this.flattenEntries(meta.content, fullName, out);
+      }
+    }
   }
 
   downloadUrl(name: string): string {

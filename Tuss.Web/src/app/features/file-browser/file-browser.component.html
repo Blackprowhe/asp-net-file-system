@@ -1,4 +1,4 @@
-﻿<div class="browser-section">
+﻿﻿<div class="browser-section">
 
   <!-- Toolbar -->
   <div class="toolbar">
@@ -39,7 +39,6 @@
             <span class="file-icon">{{ entry.file ? '📄' : '📁' }}</span>
             <span class="file-name">{{ entry.name }}</span>
             @if (entry.file) {
-              <span class="badge badge-accent" title="Aktiv version">v{{ entry.currentVersion }}</span>
               <span class="file-meta">{{ formatBytes(entry.bytes) }}</span>
             }
             <span class="file-meta">{{ entry.changed }}</span>
