@@ -30,6 +30,9 @@ export class CrossIconComponent { @Input() size = 15; }
 @Component({ selector: 'icon-chevron-right', standalone: true, template: `<svg [attr.width]="size" [attr.height]="size" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.1584 3.13508C6.35985 2.94621 6.67627 2.95642 6.86514 3.15788L10.6151 7.15788C10.7954 7.3502 10.7954 7.64949 10.6151 7.84182L6.86514 11.8418C6.67627 12.0433 6.35985 12.0535 6.1584 11.8646C5.95694 11.6757 5.94673 11.3593 6.1356 11.1579L9.565 7.49985L6.1356 3.84182C5.94673 3.64036 5.95694 3.32394 6.1584 3.13508Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>` })
 export class ChevronRightIconComponent { @Input() size = 15; }
 
+@Component({ selector: 'icon-chevron-down', standalone: true, template: `<svg [attr.width]="size" [attr.height]="size" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3.13523 6.15803C3.3241 5.95657 3.64052 5.94637 3.84197 6.13523L7.5 9.56464L11.158 6.13523C11.3595 5.94637 11.6759 5.95657 11.8648 6.15803C12.0536 6.35948 12.0434 6.6759 11.842 6.86477L7.84197 10.6148C7.64965 10.7951 7.35035 10.7951 7.15803 10.6148L3.15803 6.86477C2.95657 6.6759 2.94637 6.35948 3.13523 6.15803Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>` })
+export class ChevronDownIconComponent { @Input() size = 15; }
+
 @Component({ selector: 'icon-plus', standalone: true, template: `<svg [attr.width]="size" [attr.height]="size" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2.75C8 2.47386 7.77614 2.25 7.5 2.25C7.22386 2.25 7 2.47386 7 2.75V7H2.75C2.47386 7 2.25 7.22386 2.25 7.5C2.25 7.77614 2.47386 8 2.75 8H7V12.25C7 12.5261 7.22386 12.75 7.5 12.75C7.77614 12.75 8 12.5261 8 12.25V8H12.25C12.5261 8 12.75 7.77614 12.75 7.5C12.75 7.22386 12.5261 7 12.25 7H8V2.75Z" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"></path></svg>` })
 export class PlusIconComponent { @Input() size = 15; }
 
@@ -65,7 +68,7 @@ export const ALL_ICONS = [
   FileIconComponent, FolderIconComponent, FolderOpenIconComponent,
   UploadIconComponent, DownloadIconComponent, TrashIconComponent,
   ClockIconComponent, ResetIconComponent, CrossIconComponent,
-  ChevronRightIconComponent, PlusIconComponent, HomeIconComponent,
+  ChevronRightIconComponent, ChevronDownIconComponent, PlusIconComponent, HomeIconComponent,
   DotFilledIconComponent, CircleIconComponent,
   ImageIconComponent, VideoIconComponent, CodeIconComponent,
   TextIconComponent, ArchiveIconComponent, EyeIconComponent,
