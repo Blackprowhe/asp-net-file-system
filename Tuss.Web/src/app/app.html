@@ -12,12 +12,6 @@
 
     <main class="main-content">
 
-      <!-- Åtgärdspaneler -->
-      <div class="action-panels">
-        <app-file-upload (uploadDone)="browser.load()" />
-        <app-folder-create (folderCreated)="browser.load()" />
-      </div>
-
       <!-- Fillistan -->
       <app-file-browser #browser />
 

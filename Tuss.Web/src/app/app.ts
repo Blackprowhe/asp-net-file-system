@@ -1,13 +1,11 @@
 import { Component } from '@angular/core';
 import { FileBrowserComponent } from './features/file-browser/file-browser.component';
-import { FileUploadComponent } from './features/file-upload/file-upload.component';
-import { FolderCreateComponent } from './features/folder-create/folder-create.component';
 import { SidebarComponent } from './features/sidebar/sidebar.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [FileBrowserComponent, FileUploadComponent, FolderCreateComponent, SidebarComponent],
+  imports: [FileBrowserComponent, SidebarComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
