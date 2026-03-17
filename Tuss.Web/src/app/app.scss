@@ -61,13 +61,3 @@
   }
 }
 
-// Action panels (upload + folder side by side)
-.action-panels {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
-
-  @media (max-width: 700px) {
-    grid-template-columns: 1fr;
-  }
-}
