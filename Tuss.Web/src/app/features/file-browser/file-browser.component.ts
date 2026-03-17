@@ -1,5 +1,6 @@
 ﻿import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { NavigationService } from '../../core/services/navigation.service';
 import { StoredFile, FileVersion } from '../../core/models/file.model';
@@ -10,7 +11,7 @@ import {
   ClockIconComponent, DownloadIconComponent, TrashIconComponent,
   ResetIconComponent, ImageIconComponent, VideoIconComponent,
   CodeIconComponent, TextIconComponent, ArchiveIconComponent,
-  CrossIconComponent,
+  CrossIconComponent, PlusIconComponent, UploadIconComponent,
 } from '../../shared/icons/icons';
 
 const IMAGE_EXTS  = new Set(['.jpg','.jpeg','.png','.gif','.webp','.svg','.avif','.bmp']);
@@ -25,12 +26,12 @@ type IconType = 'image'|'video'|'code'|'text'|'archive'|'file';
   selector: 'app-file-browser',
   standalone: true,
   imports: [
-    CommonModule, FileVersionsComponent, FileSizePipe,
+    CommonModule, FormsModule, FileVersionsComponent, FileSizePipe,
     FileIconComponent, FolderIconComponent, ChevronRightIconComponent,
     ClockIconComponent, DownloadIconComponent, TrashIconComponent,
     ResetIconComponent, ImageIconComponent, VideoIconComponent,
     CodeIconComponent, TextIconComponent, ArchiveIconComponent,
-    CrossIconComponent,
+    CrossIconComponent, PlusIconComponent, UploadIconComponent,
   ],
   templateUrl: './file-browser.component.html',
   styleUrl: './file-browser.component.scss',
@@ -44,6 +45,11 @@ export class FileBrowserComponent implements OnInit {
   currentVersions = signal<FileVersion[]>([]);
   actionMessage = signal('');
   actionSuccess = signal(false);
+
+  // New Folder / Upload
+  isCreatingFolder = signal(false);
+  newFolderName = signal('');
+  showNewMenu = signal(false);
 
   // Drag & drop
   isDragOver = signal(false);
@@ -168,6 +174,88 @@ export class FileBrowserComponent implements OnInit {
     if (this.versionsFor()) {
       this.api.getVersions(this.versionsFor()!).subscribe({ next: (v) => this.currentVersions.set(v) });
     }
+  }
+
+  // ── New Actions ──────────────────────────────────────────────────────────
+  toggleNewMenu() {
+    this.showNewMenu.update(v => !v);
+  }
+
+  startCreateFolder() {
+    this.isCreatingFolder.set(true);
+    this.newFolderName.set('');
+    this.showNewMenu.set(false);
+  }
+
+  cancelCreateFolder() {
+    this.isCreatingFolder.set(false);
+    this.newFolderName.set('');
+  }
+
+  confirmCreateFolder() {
+    const name = this.newFolderName().trim();
+    if (!name) {
+      this.cancelCreateFolder();
+      return;
+    }
+
+    const prefix = this.nav.currentPath() ? this.nav.currentPath() + '/' : '';
+    const fullPath = prefix + name;
+
+    this.loading.set(true);
+    this.api.createFolder(fullPath).subscribe({
+      next: () => {
+        this.isCreatingFolder.set(false);
+        this.newFolderName.set('');
+        this.load();
+        this.setAction(`Mappen "${name}" skapades`, true);
+      },
+      error: (e) => {
+        this.loading.set(false);
+        this.setAction(e.status === 409 ? `Mappen finns redan.` : `Fel: ${e.status}`, false);
+      }
+    });
+  }
+
+  triggerUpload(input: HTMLInputElement) {
+    input.click();
+    this.showNewMenu.set(false);
+  }
+
+  onFileSelected(files: FileList | null) {
+    if (!files?.length) return;
+    const file = files[0];
+    const prefix = this.nav.currentPath() ? this.nav.currentPath() + '/' : '';
+    const fullPath = prefix + file.name;
+
+    this.loading.set(true);
+    this.api.uploadFile(fullPath, file).subscribe({
+      next: () => {
+        this.load();
+        this.setAction(`"${file.name}" uppladdad`, true);
+      },
+      error: (err) => {
+        if (err.status === 409) {
+          if (confirm(`"${file.name}" finns redan. Vill du skapa en ny version?`)) {
+            this.api.replaceFile(fullPath, file).subscribe({
+              next: () => {
+                this.load();
+                this.setAction(`Ny version av "${file.name}" skapad`, true);
+              },
+              error: (e) => {
+                this.loading.set(false);
+                this.setAction(`Fel: ${e.status}`, false);
+              }
+            });
+          } else {
+            this.loading.set(false);
+          }
+        } else {
+          this.loading.set(false);
+          this.setAction(`Fel: ${err.status}`, false);
+        }
+      },
+    });
   }
 
   // ── Delete ────────────────────────────────────────────────────────────────
