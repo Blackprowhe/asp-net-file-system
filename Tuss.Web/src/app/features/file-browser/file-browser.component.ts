@@ -29,7 +29,7 @@ type IconType = 'image'|'video'|'code'|'text'|'archive'|'file';
     FileIconComponent, FolderIconComponent, ChevronRightIconComponent,
     ClockIconComponent, DownloadIconComponent, TrashIconComponent,
     ResetIconComponent, ImageIconComponent, VideoIconComponent,
-    CodeIconComponent, TextIconComponent, ArchiveIconComponent, EyeIconComponent,
+    CodeIconComponent, TextIconComponent, ArchiveIconComponent,
     CrossIconComponent,
   ],
   templateUrl: './file-browser.component.html',
