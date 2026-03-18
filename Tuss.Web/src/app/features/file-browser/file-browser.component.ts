@@ -12,6 +12,7 @@ import {
   ResetIconComponent, ImageIconComponent, VideoIconComponent,
   CodeIconComponent, TextIconComponent, ArchiveIconComponent,
   CrossIconComponent, PlusIconComponent, UploadIconComponent,
+  ScissorsIconComponent,
 } from '../../shared/icons/icons';
 
 const IMAGE_EXTS  = new Set(['.jpg','.jpeg','.png','.gif','.webp','.svg','.avif','.bmp']);
@@ -31,7 +32,7 @@ type IconType = 'image'|'video'|'code'|'text'|'archive'|'file';
     ClockIconComponent, DownloadIconComponent, TrashIconComponent,
     ResetIconComponent, ImageIconComponent, VideoIconComponent,
     CodeIconComponent, TextIconComponent, ArchiveIconComponent,
-    CrossIconComponent, PlusIconComponent, UploadIconComponent,
+    CrossIconComponent, PlusIconComponent, UploadIconComponent, ScissorsIconComponent,
   ],
   templateUrl: './file-browser.component.html',
   styleUrl: './file-browser.component.scss',
