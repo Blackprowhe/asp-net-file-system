@@ -54,6 +54,9 @@ export class FileBrowserComponent implements OnInit {
 
   // Drag & drop
   isDragOver = signal(false);
+  draggedEntry = signal<StoredFile | null>(null);
+  dropTarget = signal<string | null>(null);
+
 
   // Bildförhandsvisning
   previewUrl = signal<string | null>(null);
@@ -127,39 +130,111 @@ export class FileBrowserComponent implements OnInit {
     this.previewUrl.set(null);
     this.previewName.set('');
   }
+// ── Drag & drop ──────────────────────────────────────────────────────────
+onDragStart(entry: StoredFile, e: DragEvent) {
+  this.draggedEntry.set(entry);
+  e.dataTransfer?.setData('application/x-tuss-entry', entry.name);
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+}
 
-  // ── Drag & drop ──────────────────────────────────────────────────────────
-  onDragOver(e: DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    this.isDragOver.set(true);
+onDragOver(e: DragEvent) {
+  e.preventDefault();
+  e.stopPropagation();
+  this.isDragOver.set(true);
+}
+
+onDragLeave(e: DragEvent) {
+  e.preventDefault();
+  e.stopPropagation();
+  this.isDragOver.set(false);
+}
+
+onDrop(e: DragEvent) {
+  e.preventDefault();
+  e.stopPropagation();
+  this.isDragOver.set(false);
+
+  const sourcePath = e.dataTransfer?.getData('application/x-tuss-entry');
+  const targetPath = this.nav.currentPath();
+
+  if (sourcePath) {
+    // Intern flytt till nuvarande mapp (om den inte redan är där)
+    const parent = sourcePath.includes('/') ? sourcePath.substring(0, sourcePath.lastIndexOf('/')) : '';
+    if (parent === targetPath) return;
+
+    const shortName = sourcePath.split('/').pop()!;
+    const newPath = targetPath ? `${targetPath}/${shortName}` : shortName;
+
+    this.api.moveEntry(sourcePath, newPath).subscribe({
+      next: () => this.load(),
+      error: (err) => this.setAction(`Fel: ${err.status}`, false)
+    });
+    return;
   }
 
-  onDragLeave(e: DragEvent) {
-    e.preventDefault();
-    this.isDragOver.set(false);
-  }
+  // Extern uppladdning
+  const files = e.dataTransfer?.files;
+  if (!files?.length) return;
+  this.loading.set(true);
+  this.api.bulkUpload(targetPath, Array.from(files)).subscribe({
+    next: () => {
+      this.setAction(`${files.length} filer uppladdade`, true);
+      this.load();
+    },
+    error: (err) => {
+      this.loading.set(false);
+      this.setAction(`Fel vid uppladdning: ${err.status}`, false);
+    }
+  });
+}
 
-  onDrop(e: DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    this.isDragOver.set(false);
+onDragOverRow(e: DragEvent, entry: StoredFile) {
+  if (entry.file) return;
+  e.preventDefault();
+  e.stopPropagation();
+  this.dropTarget.set(entry.name);
+}
+
+onDragLeaveRow(e: DragEvent) {
+  this.dropTarget.set(null);
+}
+
+onDropOnFolder(e: DragEvent, targetEntry: StoredFile) {
+  if (targetEntry.file) return;
+  e.preventDefault();
+  e.stopPropagation();
+  this.dropTarget.set(null);
+
+  const sourcePath = e.dataTransfer?.getData('application/x-tuss-entry');
+
+  if (sourcePath) {
+    if (sourcePath === targetEntry.name) return;
+    if (sourcePath.startsWith(targetEntry.name + '/')) return; // Kan inte flytta mapp in i sig själv
+
+    const shortName = sourcePath.split('/').pop()!;
+    const newPath = `${targetEntry.name}/${shortName}`;
+
+    this.api.moveEntry(sourcePath, newPath).subscribe({
+      next: () => this.load(),
+      error: (err) => this.setAction(`Fel: ${err.status}`, false)
+    });
+  } else {
     const files = e.dataTransfer?.files;
     if (!files?.length) return;
-    const prefix = this.nav.currentPath() ? this.nav.currentPath() + '/' : '';
-    Array.from(files).forEach(file => {
-      const fullPath = prefix + file.name;
-      this.api.uploadFile(fullPath, file).subscribe({
-        next: () => this.load(),
-        error: (err) => {
-          if (err.status === 409) {
-            // Finns redan — gör PUT (ny version)
-            this.api.replaceFile(fullPath, file).subscribe({ next: () => this.load() });
-          }
-        },
-      });
+    this.loading.set(true);
+    this.api.bulkUpload(targetEntry.name, Array.from(files)).subscribe({
+      next: () => {
+        this.setAction(`${files.length} filer uppladdade till ${targetEntry.name}`, true);
+        this.load();
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.setAction(`Fel: ${err.status}`, false);
+      }
     });
   }
+}
+
 
   // ── Versions ─────────────────────────────────────────────────────────────
   showVersions(entry: StoredFile) {
@@ -226,35 +301,23 @@ export class FileBrowserComponent implements OnInit {
   onFileSelected(files: FileList | null) {
     if (!files?.length) return;
     const file = files[0];
-    const prefix = this.nav.currentPath() ? this.nav.currentPath() + '/' : '';
-    const fullPath = prefix + file.name;
 
     this.loading.set(true);
-    this.api.uploadFile(fullPath, file).subscribe({
+    this.api.bulkUpload(targetPath, fileList).subscribe({
       next: () => {
+        this.setAction(`${fileList.length} filer uppladdade`, true);
         this.load();
-        this.setAction(`"${file.name}" uppladdad`, true);
       },
       error: (err) => {
         if (err.status === 409) {
-          if (confirm(`"${file.name}" finns redan. Vill du skapa en ny version?`)) {
             this.api.replaceFile(fullPath, file).subscribe({
-              next: () => {
                 this.load();
-                this.setAction(`Ny version av "${file.name}" skapad`, true);
               },
-              error: (e) => {
                 this.loading.set(false);
-                this.setAction(`Fel: ${e.status}`, false);
               }
-            });
           } else {
-            this.loading.set(false);
           }
-        } else {
           this.loading.set(false);
-          this.setAction(`Fel: ${err.status}`, false);
-        }
       },
     });
   }

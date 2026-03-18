@@ -34,7 +34,7 @@
           </div>
           <div class="menu-backdrop" (click)="showNewMenu.set(false)"></div>
         }
-        <input type="file" #fileInput style="display:none" (change)="onFileSelected(fileInput.files)" />
+        <input type="file" #fileInput style="display:none" multiple (change)="onFileSelected(fileInput.files)" />
       </div>
 
       <button class="btn btn-ghost btn-icon btn-sm"
