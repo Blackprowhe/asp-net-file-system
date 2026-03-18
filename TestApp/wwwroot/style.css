@@ -1,0 +1,28 @@
+*{
+    box-sizing: border-box ;
+
+}
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0;
+   height: 100vh;
+   display: flex;
+   background: #f4f4f4;
+   color: #222
+}
+.sidebar {
+    width: 260px;
+    background: #1f1f1f;
+    color:white;
+    padding: 20px;
+    overflow-y: auto;
+}
+.sidebar h2 {
+    margin-top: 0;
+    font-size: 22px;
+}
+.file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
