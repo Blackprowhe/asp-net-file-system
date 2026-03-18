@@ -74,4 +74,31 @@ export class ApiService {
   deleteFolder(path: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/files/${encodePath(path)}`);
   }
+
+  // ── Flytt & Bulk ────────────────────────────────────────────────────────
+
+  moveEntry(oldPath: string, newPath: string): Observable<void> {
+    return this.http.patch<void>(
+      `${this.base}/files/${encodePath(oldPath)}?newPath=${encodeURIComponent(newPath)}`,
+      null
+    );
+  }
+
+  bulkDelete(paths: string[]): Observable<void> {
+    return this.http.post<void>(`${this.base}/files/bulk-delete`, paths);
+  }
+
+  bulkMove(paths: string[], targetFolder: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/files/bulk-move`, {
+      paths,
+      targetFolder,
+    });
+  }
+
+  bulkUpload(targetFolder: string, files: File[]): Observable<void> {
+    const formData = new FormData();
+    formData.append('targetFolder', targetFolder);
+    files.forEach((file) => formData.append('files', file, file.name));
+    return this.http.post<void>(`${this.base}/files/bulk-upload`, formData);
+  }
 }
