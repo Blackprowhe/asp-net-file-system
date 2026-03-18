@@ -58,5 +58,4 @@ app.MapFallback(async context =>
 
 app.Run();
 
-public record BulkMoveRequest(string[] paths, string targetFolder);
 
