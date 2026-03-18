@@ -10,17 +10,6 @@ namespace Tuss.Server.Services;
 /// </summary>
 public class FileRepository(DatabaseService db, FileStorageService storage, VersionRepository versions)
 {
-    // ─── Headers ─────────────────────────────────────────────────────────────
-
-    public static void ApplyHeaders(HttpContext context, StoredFile file)
-    {
-        context.Response.Headers["X-Created-At"] = file.Created;
-        context.Response.Headers["X-Changed-At"] = file.Changed;
-        context.Response.Headers["X-Type"]       = file.IsFile ? "file" : "folder";
-        context.Response.Headers["X-Bytes"]      = file.Bytes.ToString();
-        context.Response.Headers["X-Extension"]  = file.Extension;
-    }
-
     // ─── Mapping ─────────────────────────────────────────────────────────────
 
     private static StoredFile MapRow(SqliteDataReader r) => new()

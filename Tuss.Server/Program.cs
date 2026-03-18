@@ -36,45 +36,6 @@ app.UseCors(x => x.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-
-// Bygger svarsobjektet för en fil
-static object FileToDto(Tuss.Server.Models.StoredFile f) => new
-{
-    created   = f.Created,
-    changed   = f.Changed,
-    file      = f.IsFile,
-    bytes     = f.Bytes,
-    extension = f.Extension,
-};
-
-// Bygger nästlat träd av mappar med "content"-property som specen kräver
-static object FolderToDto(Tuss.Server.Models.StoredFile folder, FileRepository files)
-{
-    var children = files.GetDirectChildren(folder.Name);
-    var content = new Dictionary<string, object>();
-    var prefix  = folder.Name + "/";
-    foreach (var child in children)
-    {
-        var shortName = child.Name[prefix.Length..];
-        content[shortName] = child.IsFile
-            ? FileToDto(child)
-            : FolderToDto(child, files);
-    }
-    return new
-    {
-        created = folder.Created,
-        changed = folder.Changed,
-        file    = false,
-        bytes   = files.GetFolderSize(folder.Name),
-        content,
-    };
-}
-
-// Avgör om requesten har body-innehåll
-static bool HasBody(HttpContext ctx) =>
-    ctx.Request.ContentLength is > 0
-    || ctx.Request.Headers.ContentType.Count > 0;
-
 // ─── Endpoints ───────────────────────────────────────────────────────────────
 
 app.MapBulkEndpoints();       // Måste registreras före fil-endpoints (mer specifika rutter först)
