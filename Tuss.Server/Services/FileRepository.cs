@@ -416,6 +416,13 @@ public class FileRepository
         using var tx = con.BeginTransaction();
         try
         {
+            // Move updates both parent (Files) and child rows (Versions).
+            // Defer FK checks until COMMIT so intermediate names are allowed.
+            var deferFk = con.CreateCommand();
+            deferFk.Transaction = tx;
+            deferFk.CommandText = "PRAGMA defer_foreign_keys = ON;";
+            deferFk.ExecuteNonQuery();
+
             // För en mapp måste vi flytta allt under den också
             if (!entry.IsFile)
             {
