@@ -203,12 +203,9 @@
 
               <!--
                 Actions — alltid exakt 3 slots à 28px + 2×4px gap = 96px
-                Slot 1: preview (bild) | tomt (övrigt) | tomt (mapp)
-                Slot 2: versioner (fil)  | tomt (mapp)
-                Slot 3: ladda ned (fil)  | tomt (mapp)
-                Slot 4: ta bort (alltid)
-
-                Vänta — 4 slots = 4×28 + 3×4 = 124px. Sätter width: 124px.
+                Slot 1: versioner (fil)  | tomt (mapp)
+                Slot 2: ladda ned (fil)  | tomt (mapp)
+                Slot 3: ta bort (alltid)
               -->
               <span class="file-actions" (click)="$event.stopPropagation()">
                 @if (entry.file) {
@@ -221,11 +218,7 @@
                   <a class="btn btn-ghost btn-icon btn-sm" [href]="downloadUrl(entry.name)" [attr.download]="nav.shortName(entry.name)" title="Ladda ned">
                     <icon-download [size]="15" />
                   </a>
-                  <!-- Slot 3: klipp ut -->
-                  <button class="btn btn-ghost btn-icon btn-sm" (click)="cutEntry(entry)" title="Klipp ut">
-                    <icon-scissors [size]="15" />
-                  </button>
-                  <!-- Slot 4: ta bort -->
+                  <!-- Slot 3: ta bort -->
                   <button class="btn btn-ghost btn-icon btn-sm action-danger" (click)="deleteFile(entry.name)" title="Ta bort">
                     <icon-trash [size]="15" />
                   </button>

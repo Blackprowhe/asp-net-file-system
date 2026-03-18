@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="storage\" />
     <Folder Include="wwwroot\" />
   </ItemGroup>
 
