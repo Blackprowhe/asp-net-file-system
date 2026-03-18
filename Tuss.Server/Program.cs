@@ -1,3 +1,4 @@
+using Tuss.Server.Endpoints;
 using Tuss.Server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +15,8 @@ builder.Services.AddCors();
 // Registrera databasen som en singleton – samma instans används överallt
 var dbPath = Path.Combine(builder.Environment.ContentRootPath, "tuss.db");
 builder.Services.AddSingleton(new DatabaseService(dbPath));
+builder.Services.AddSingleton<FileStorageService>();
+builder.Services.AddSingleton<VersionRepository>();
 builder.Services.AddSingleton<FileRepository>();
 
 var app = builder.Build();
