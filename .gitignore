@@ -126,3 +126,12 @@ TestResults/
 coverage/
 *.trx
 *.coveragexml
+
+# ========================
+# Local runtime and generated app artifacts
+# ========================
+Tuss.Server/*.db
+Tuss.Server/*.db-wal
+Tuss.Server/*.db-shm
+Tuss.Server/storage/
+Tuss.Server/wwwroot/

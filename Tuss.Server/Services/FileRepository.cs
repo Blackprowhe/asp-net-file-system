@@ -400,4 +400,98 @@ public class FileRepository
         cmd.Parameters.AddWithValue("$prefix", folderName + "/%");
         return (long)(cmd.ExecuteScalar() ?? 0L);
     }
+
+    // ─── Flytt & Bulk ────────────────────────────────────────────────────────
+
+    public void MoveEntry(string oldName, string newName)
+    {
+        if (oldName == newName) return;
+        var entry = GetByName(oldName);
+        if (entry is null) return;
+
+        var now = Now();
+        EnsureParentFolders(newName, now);
+
+        using var con = _db.CreateConnection();
+        using var tx = con.BeginTransaction();
+        try
+        {
+            // Move updates both parent (Files) and child rows (Versions).
+            // Defer FK checks until COMMIT so intermediate names are allowed.
+            var deferFk = con.CreateCommand();
+            deferFk.Transaction = tx;
+            deferFk.CommandText = "PRAGMA defer_foreign_keys = ON;";
+            deferFk.ExecuteNonQuery();
+
+            // För en mapp måste vi flytta allt under den också
+            if (!entry.IsFile)
+            {
+                var cmdFiles = con.CreateCommand();
+                cmdFiles.Transaction = tx;
+                cmdFiles.CommandText = """
+                    UPDATE Files 
+                    SET Name = $newName || SUBSTR(Name, LENGTH($oldName) + 1),
+                        Changed = $now
+                    WHERE Name = $oldName OR Name LIKE $oldPrefix;
+                    """;
+                cmdFiles.Parameters.AddWithValue("$oldName", oldName);
+                cmdFiles.Parameters.AddWithValue("$newName", newName);
+                cmdFiles.Parameters.AddWithValue("$oldPrefix", oldName + "/%");
+                cmdFiles.Parameters.AddWithValue("$now", now);
+                cmdFiles.ExecuteNonQuery();
+
+                var cmdVers = con.CreateCommand();
+                cmdVers.Transaction = tx;
+                cmdVers.CommandText = """
+                    UPDATE Versions
+                    SET FileName = $newName || SUBSTR(FileName, LENGTH($oldName) + 1)
+                    WHERE FileName LIKE $oldPrefix OR FileName = $oldName;
+                    """;
+                cmdVers.Parameters.AddWithValue("$oldName", oldName);
+                cmdVers.Parameters.AddWithValue("$newName", newName);
+                cmdVers.Parameters.AddWithValue("$oldPrefix", oldName + "/%");
+                cmdVers.ExecuteNonQuery();
+            }
+            else
+            {
+                var cmdFile = con.CreateCommand();
+                cmdFile.Transaction = tx;
+                cmdFile.CommandText = "UPDATE Files SET Name = $newName, Changed = $now WHERE Name = $oldName";
+                cmdFile.Parameters.AddWithValue("$oldName", oldName);
+                cmdFile.Parameters.AddWithValue("$newName", newName);
+                cmdFile.Parameters.AddWithValue("$now", now);
+                cmdFile.ExecuteNonQuery();
+
+                var cmdVers = con.CreateCommand();
+                cmdVers.Transaction = tx;
+                cmdVers.CommandText = "UPDATE Versions SET FileName = $newName WHERE FileName = $oldName";
+                cmdVers.Parameters.AddWithValue("$oldName", oldName);
+                cmdVers.Parameters.AddWithValue("$newName", newName);
+                cmdVers.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+    }
+
+    public void BulkDelete(IEnumerable<string> names)
+    {
+        foreach (var name in names)
+            DeleteEntry(name);
+    }
+
+    public void BulkMove(IEnumerable<string> names, string targetFolder)
+    {
+        foreach (var name in names)
+        {
+            var shortName = name.Contains('/') ? name[(name.LastIndexOf('/') + 1)..] : name;
+            var newName = string.IsNullOrEmpty(targetFolder) ? shortName : $"{targetFolder}/{shortName}";
+            MoveEntry(name, newName);
+        }
+    }
 }

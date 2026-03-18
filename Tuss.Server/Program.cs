@@ -158,7 +158,7 @@ app.MapMethods("/api/files/{*path}", ["HEAD"], (string path, FileRepository file
     return Results.Ok();
 });
 
-// ─── DELETE /api/files/{*path} ───────────────────────────────────────────────
+// ─── Delete / api/files/{*path} ───────────────────────────────────────────────
 
 // Tar bort fil eller mapp (och allt under den). Alltid 200.
 app.MapDelete("/api/files/{*path}", (string path, FileRepository files) =>
@@ -167,7 +167,49 @@ app.MapDelete("/api/files/{*path}", (string path, FileRepository files) =>
     return Results.Ok();
 });
 
+// ─── Move & Bulk ─────────────────────────────────────────────────────────────
+
+// Flyttar en fil eller mapp.
+app.MapMethods("/api/files/{*path}", ["PATCH"], (string path, string newPath, FileRepository files) =>
+{
+    path = Uri.UnescapeDataString(path);
+    newPath = Uri.UnescapeDataString(newPath);
+    files.MoveEntry(path, newPath);
+    return Results.Ok();
+});
+
+// Bulk-radera
+app.MapPost("/api/files/bulk-delete", (string[] paths, FileRepository files) =>
+{
+    files.BulkDelete(paths);
+    return Results.Ok();
+});
+
+// Bulk-flytta
+app.MapPost("/api/files/bulk-move", (BulkMoveRequest req, FileRepository files) =>
+{
+    files.BulkMove(req.paths, req.targetFolder);
+    return Results.Ok();
+});
+
+// Bulk-importera (upload)
+app.MapPost("/api/files/bulk-upload", async (HttpRequest request, FileRepository files) =>
+{
+    if (!request.HasFormContentType) return Results.BadRequest("Missing form content");
+    var form = await request.ReadFormAsync();
+    var targetFolder = form["targetFolder"].ToString();
+
+    foreach (var file in form.Files)
+    {
+        var path = string.IsNullOrEmpty(targetFolder) ? file.FileName : $"{targetFolder}/{file.FileName}";
+        await using var stream = file.OpenReadStream();
+        await files.UpsertAsync(path, stream);
+    }
+    return Results.Ok();
+});
+
 // ─── Versioner ───────────────────────────────────────────────────────────────
+
 
 app.MapGet("/api/files/{filename}/versions", (string filename, FileRepository files) =>
 {
@@ -217,4 +259,6 @@ app.MapFallback(async context =>
 });
 
 app.Run();
+
+public record BulkMoveRequest(string[] paths, string targetFolder);
 
