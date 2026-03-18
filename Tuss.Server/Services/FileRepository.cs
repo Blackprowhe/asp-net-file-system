@@ -3,18 +3,13 @@ using Tuss.Server.Models;
 
 namespace Tuss.Server.Services;
 
-public class FileRepository
+/// <summary>
+/// Ansvarar för CRUD mot Files-tabellen och grundläggande filoperationer.
+/// Disk-I/O delegeras till <see cref="FileStorageService"/>,
+/// versionsrader delegeras till <see cref="VersionRepository"/>.
+/// </summary>
+public class FileRepository(DatabaseService db, FileStorageService storage, VersionRepository versions)
 {
-    private readonly DatabaseService _db;
-    private readonly string _storageRoot;
-
-    public FileRepository(DatabaseService db, IWebHostEnvironment env)
-    {
-        _db = db;
-        _storageRoot = Path.Combine(env.ContentRootPath, "storage");
-        Directory.CreateDirectory(_storageRoot);
-    }
-
     // ─── Headers ─────────────────────────────────────────────────────────────
 
     public static void ApplyHeaders(HttpContext context, StoredFile file)
@@ -48,7 +43,7 @@ public class FileRepository
     /// <summary>Hämtar alla poster (filer + mappar).</summary>
     public List<StoredFile> GetAll()
     {
-        using var con = _db.CreateConnection();
+        using var con = db.CreateConnection();
         var cmd = con.CreateCommand();
         cmd.CommandText = $"SELECT {SelectColumns} FROM Files ORDER BY IsFile, Name";
         var list = new List<StoredFile>();
@@ -62,7 +57,7 @@ public class FileRepository
     {
         // Barn av "mapp 1" har namn som börjar med "mapp 1/"
         var prefix = folderName + "/";
-        using var con = _db.CreateConnection();
+        using var con = db.CreateConnection();
         var cmd = con.CreateCommand();
         cmd.CommandText = $"SELECT {SelectColumns} FROM Files WHERE Name LIKE $prefix ORDER BY IsFile, Name";
         cmd.Parameters.AddWithValue("$prefix", prefix + "%");
@@ -86,7 +81,7 @@ public class FileRepository
     public List<StoredFile> GetAllInFolder(string folderName)
     {
         var prefix = folderName + "/";
-        using var con = _db.CreateConnection();
+        using var con = db.CreateConnection();
         var cmd = con.CreateCommand();
         cmd.CommandText = $"SELECT {SelectColumns} FROM Files WHERE Name LIKE $prefix ORDER BY IsFile, Name";
         cmd.Parameters.AddWithValue("$prefix", prefix + "%");
@@ -98,7 +93,7 @@ public class FileRepository
 
     public StoredFile? GetByName(string name)
     {
-        using var con = _db.CreateConnection();
+        using var con = db.CreateConnection();
         var cmd = con.CreateCommand();
         cmd.CommandText = $"SELECT {SelectColumns} FROM Files WHERE Name = $name";
         cmd.Parameters.AddWithValue("$name", name);
@@ -106,14 +101,11 @@ public class FileRepository
         return r.Read() ? MapRow(r) : null;
     }
 
-    public Stream OpenRead(StoredFile file) => File.OpenRead(file.DiskPath);
+    public Stream OpenRead(StoredFile file) => storage.OpenRead(file.DiskPath);
 
     // ─── Mappar ──────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Skapar en mapp. Returnerar false om den redan finns.
-    /// Mapp-namn lagras utan trailing slash, t.ex. "mapp 1" eller "mapp 1/sub".
-    /// </summary>
+    /// <summary>Skapar en mapp. Returnerar false om den redan finns.</summary>
     public bool CreateFolder(string name)
     {
         if (GetByName(name) is not null)
@@ -122,7 +114,7 @@ public class FileRepository
         var now = Now();
         EnsureParentFolders(name, now);
 
-        using var con = _db.CreateConnection();
+        using var con = db.CreateConnection();
         var cmd = con.CreateCommand();
         cmd.CommandText = """
             INSERT OR IGNORE INTO Files (Name, DiskPath, Created, Changed, IsFile, Bytes, Extension, CurrentVersion)
@@ -134,13 +126,13 @@ public class FileRepository
         return (long)(cmd.ExecuteScalar() ?? 0L) > 0;
     }
 
-    /// <summary>Skapar en mapp om den inte finns, gör inget om den finns (PUT-beteende).</summary>
+    /// <summary>Skapar en mapp om den inte finns, uppdaterar Changed om den finns.</summary>
     public void UpsertFolder(string name)
     {
         var now = Now();
         EnsureParentFolders(name, now);
 
-        using var con = _db.CreateConnection();
+        using var con = db.CreateConnection();
         var cmd = con.CreateCommand();
         cmd.CommandText = """
             INSERT INTO Files (Name, DiskPath, Created, Changed, IsFile, Bytes, Extension, CurrentVersion)
@@ -152,32 +144,24 @@ public class FileRepository
         cmd.ExecuteNonQuery();
     }
 
-    /// <summary>Tar bort en mapp (eller fil) och allt under den.</summary>
+    /// <summary>Tar bort en fil/mapp och allt under den (inklusive versioner på disk).</summary>
     public void DeleteEntry(string name)
     {
         var entry = GetByName(name);
         if (entry is null) return;
 
-        if (entry.IsFile)
+        // Radera fysiska filer från disk
+        var filesToClean = entry.IsFile
+            ? new List<StoredFile> { entry }
+            : GetAllInFolder(name).Where(c => c.IsFile).ToList();
+
+        foreach (var file in filesToClean)
         {
-            // Radera alla versioner av filen från disk
-            var versions = GetVersions(name);
-            foreach (var v in versions)
-                if (File.Exists(v.DiskPath)) File.Delete(v.DiskPath);
-        }
-        else
-        {
-            // Radera alla filer i mappen från disk
-            var children = GetAllInFolder(name);
-            foreach (var child in children.Where(c => c.IsFile))
-            {
-                var versions = GetVersions(child.Name);
-                foreach (var v in versions)
-                    if (File.Exists(v.DiskPath)) File.Delete(v.DiskPath);
-            }
+            foreach (var v in versions.GetVersions(file.Name))
+                storage.DeleteIfExists(v.DiskPath);
         }
 
-        using var con = _db.CreateConnection();
+        using var con = db.CreateConnection();
         var cmd = con.CreateCommand();
         cmd.CommandText = "DELETE FROM Files WHERE Name = $name OR Name LIKE $prefix";
         cmd.Parameters.AddWithValue("$name", name);
@@ -195,16 +179,12 @@ public class FileRepository
 
         var now       = Now();
         var extension = Path.GetExtension(name);
-        var diskPath  = GetVersionDiskPath(name, 1);
+        var diskPath  = storage.GetVersionDiskPath(name, 1);
 
         EnsureParentFolders(name, now);
-        Directory.CreateDirectory(Path.GetDirectoryName(diskPath)!);
-        await using (var fs = File.Create(diskPath))
-            await body.CopyToAsync(fs);
+        var bytes = await storage.SaveToDiskAsync(diskPath, body);
 
-        var bytes = new FileInfo(diskPath).Length;
-
-        using var con = _db.CreateConnection();
+        using var con = db.CreateConnection();
         using var tx  = con.BeginTransaction();
         try
         {
@@ -225,29 +205,18 @@ public class FileRepository
             if (rows == 0)
             {
                 tx.Rollback();
-                File.Delete(diskPath);
+                storage.DeleteIfExists(diskPath);
                 return false;
             }
 
-            var cmdVer = con.CreateCommand();
-            cmdVer.Transaction = tx;
-            cmdVer.CommandText = """
-                INSERT INTO Versions (FileName, Version, DiskPath, CreatedAt, Bytes)
-                VALUES ($name, 1, $diskPath, $now, $bytes);
-                """;
-            cmdVer.Parameters.AddWithValue("$name",     name);
-            cmdVer.Parameters.AddWithValue("$diskPath", diskPath);
-            cmdVer.Parameters.AddWithValue("$now",      now);
-            cmdVer.Parameters.AddWithValue("$bytes",    bytes);
-            cmdVer.ExecuteNonQuery();
-
+            versions.InsertVersion(con, tx, name, 1, diskPath, now, bytes);
             tx.Commit();
             return true;
         }
         catch
         {
             tx.Rollback();
-            if (File.Exists(diskPath)) File.Delete(diskPath);
+            storage.DeleteIfExists(diskPath);
             throw;
         }
     }
@@ -260,16 +229,12 @@ public class FileRepository
 
         var existing    = GetByName(name);
         var nextVersion = (existing?.CurrentVersion ?? 0) + 1;
-        var diskPath    = GetVersionDiskPath(name, nextVersion);
+        var diskPath    = storage.GetVersionDiskPath(name, nextVersion);
 
         EnsureParentFolders(name, now);
-        Directory.CreateDirectory(Path.GetDirectoryName(diskPath)!);
-        await using (var fs = File.Create(diskPath))
-            await body.CopyToAsync(fs);
+        var bytes = await storage.SaveToDiskAsync(diskPath, body);
 
-        var bytes = new FileInfo(diskPath).Length;
-
-        using var con = _db.CreateConnection();
+        using var con = db.CreateConnection();
         using var tx  = con.BeginTransaction();
 
         var cmdFile = con.CreateCommand();
@@ -291,110 +256,16 @@ public class FileRepository
         cmdFile.Parameters.AddWithValue("$version",   nextVersion);
         cmdFile.ExecuteNonQuery();
 
-        var cmdVer = con.CreateCommand();
-        cmdVer.Transaction = tx;
-        cmdVer.CommandText = """
-            INSERT OR IGNORE INTO Versions (FileName, Version, DiskPath, CreatedAt, Bytes)
-            VALUES ($name, $version, $diskPath, $now, $bytes);
-            """;
-        cmdVer.Parameters.AddWithValue("$name",     name);
-        cmdVer.Parameters.AddWithValue("$version",  nextVersion);
-        cmdVer.Parameters.AddWithValue("$diskPath", diskPath);
-        cmdVer.Parameters.AddWithValue("$now",      now);
-        cmdVer.Parameters.AddWithValue("$bytes",    bytes);
-        cmdVer.ExecuteNonQuery();
-
+        versions.InsertVersion(con, tx, name, nextVersion, diskPath, now, bytes);
         tx.Commit();
     }
 
-    // ─── Versioner ────────────────────────────────────────────────────────────
+    // ─── Storlek ─────────────────────────────────────────────────────────────
 
-    public List<FileVersion> GetVersions(string fileName)
-    {
-        using var con = _db.CreateConnection();
-        var cmd = con.CreateCommand();
-        cmd.CommandText = """
-            SELECT Id, FileName, Version, DiskPath, CreatedAt, Bytes
-            FROM Versions WHERE FileName = $name ORDER BY Version DESC
-            """;
-        cmd.Parameters.AddWithValue("$name", fileName);
-        var list = new List<FileVersion>();
-        using var r = cmd.ExecuteReader();
-        while (r.Read())
-            list.Add(new FileVersion
-            {
-                Id = r.GetInt64(0), FileName = r.GetString(1), Version = r.GetInt32(2),
-                DiskPath = r.GetString(3), CreatedAt = r.GetString(4), Bytes = r.GetInt64(5),
-            });
-        return list;
-    }
-
-    public FileVersion? GetVersion(string fileName, int version)
-    {
-        using var con = _db.CreateConnection();
-        var cmd = con.CreateCommand();
-        cmd.CommandText = """
-            SELECT Id, FileName, Version, DiskPath, CreatedAt, Bytes
-            FROM Versions WHERE FileName = $name AND Version = $version
-            """;
-        cmd.Parameters.AddWithValue("$name",    fileName);
-        cmd.Parameters.AddWithValue("$version", version);
-        using var r = cmd.ExecuteReader();
-        if (!r.Read()) return null;
-        return new FileVersion
-        {
-            Id = r.GetInt64(0), FileName = r.GetString(1), Version = r.GetInt32(2),
-            DiskPath = r.GetString(3), CreatedAt = r.GetString(4), Bytes = r.GetInt64(5),
-        };
-    }
-
-    public async Task RestoreVersionAsync(string fileName, int version)
-    {
-        var target = GetVersion(fileName, version)
-            ?? throw new FileNotFoundException($"Version {version} av '{fileName}' hittades inte.");
-        await using var stream = File.OpenRead(target.DiskPath);
-        await UpsertAsync(fileName, stream);
-    }
-
-    // ─── Helpers ─────────────────────────────────────────────────────────────
-
-    private static string Now() => DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
-
-    private string GetVersionDiskPath(string name, int version)
-    {
-        var safeName = name.Replace("/", "_").Replace("\\", "_");
-        return Path.Combine(_storageRoot, $"{safeName}_v{version}");
-    }
-
-    /// <summary>
-    /// Skapar föräldersmappar i databasen.
-    /// "a/b/c/fil.txt" → skapar "a" och "a/b" och "a/b/c"
-    /// </summary>
-    private void EnsureParentFolders(string path, string now)
-    {
-        var parts = path.Split('/');
-        // Allt utom sista segmentet är föräldrar
-        for (var i = 1; i < parts.Length; i++)
-        {
-            var folderName = string.Join("/", parts[..i]);
-            using var con = _db.CreateConnection();
-            var cmd = con.CreateCommand();
-            cmd.CommandText = """
-                INSERT OR IGNORE INTO Files (Name, DiskPath, Created, Changed, IsFile, Bytes, Extension, CurrentVersion)
-                VALUES ($name, '', $now, $now, 0, 0, '', 0);
-                """;
-            cmd.Parameters.AddWithValue("$name", folderName);
-            cmd.Parameters.AddWithValue("$now",  now);
-            cmd.ExecuteNonQuery();
-        }
-    }
-
-    /// <summary>
-    /// Beräknar total storlek i bytes av allt i en mapp.
-    /// </summary>
+    /// <summary>Beräknar total storlek i bytes av allt i en mapp.</summary>
     public long GetFolderSize(string folderName)
     {
-        using var con = _db.CreateConnection();
+        using var con = db.CreateConnection();
         var cmd = con.CreateCommand();
         cmd.CommandText = "SELECT COALESCE(SUM(Bytes), 0) FROM Files WHERE Name LIKE $prefix AND IsFile = 1";
         cmd.Parameters.AddWithValue("$prefix", folderName + "/%");
@@ -412,18 +283,15 @@ public class FileRepository
         var now = Now();
         EnsureParentFolders(newName, now);
 
-        using var con = _db.CreateConnection();
-        using var tx = con.BeginTransaction();
+        using var con = db.CreateConnection();
+        using var tx  = con.BeginTransaction();
         try
         {
-            // Move updates both parent (Files) and child rows (Versions).
-            // Defer FK checks until COMMIT so intermediate names are allowed.
             var deferFk = con.CreateCommand();
             deferFk.Transaction = tx;
             deferFk.CommandText = "PRAGMA defer_foreign_keys = ON;";
             deferFk.ExecuteNonQuery();
 
-            // För en mapp måste vi flytta allt under den också
             if (!entry.IsFile)
             {
                 var cmdFiles = con.CreateCommand();
@@ -490,8 +358,35 @@ public class FileRepository
         foreach (var name in names)
         {
             var shortName = name.Contains('/') ? name[(name.LastIndexOf('/') + 1)..] : name;
-            var newName = string.IsNullOrEmpty(targetFolder) ? shortName : $"{targetFolder}/{shortName}";
+            var newName   = string.IsNullOrEmpty(targetFolder) ? shortName : $"{targetFolder}/{shortName}";
             MoveEntry(name, newName);
+        }
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    private static string Now() => DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+
+    /// <summary>
+    /// Skapar föräldramappar i databasen.
+    /// "a/b/c/fil.txt" → skapar "a", "a/b" och "a/b/c".
+    /// </summary>
+    private void EnsureParentFolders(string path, string now)
+    {
+        var parts = path.Split('/');
+        // Allt utom sista segmentet är föräldrar
+        for (var i = 1; i < parts.Length; i++)
+        {
+            var folderName = string.Join("/", parts[..i]);
+            using var con = db.CreateConnection();
+            var cmd = con.CreateCommand();
+            cmd.CommandText = """
+                INSERT OR IGNORE INTO Files (Name, DiskPath, Created, Changed, IsFile, Bytes, Extension, CurrentVersion)
+                VALUES ($name, '', $now, $now, 0, 0, '', 0);
+                """;
+            cmd.Parameters.AddWithValue("$name", folderName);
+            cmd.Parameters.AddWithValue("$now",  now);
+            cmd.ExecuteNonQuery();
         }
     }
 }
