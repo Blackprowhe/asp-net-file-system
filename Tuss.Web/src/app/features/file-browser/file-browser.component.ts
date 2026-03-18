@@ -1,4 +1,4 @@
-﻿import { Component, inject, signal, OnInit } from '@angular/core';
+﻿import { Component, inject, signal, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
@@ -51,16 +51,39 @@ export class FileBrowserComponent implements OnInit {
   isCreatingFolder = signal(false);
   newFolderName = signal('');
   showNewMenu = signal(false);
+  showMoveMenu = signal(false);
 
   // Drag & drop
   isDragOver = signal(false);
   draggedEntry = signal<StoredFile | null>(null);
   dropTarget = signal<string | null>(null);
 
+  // Selection & Bulk
+  selectedPaths = signal<Set<string>>(new Set());
+  clipboard = signal<{ paths: string[], mode: 'cut' | 'copy' | null }>({ paths: [], mode: null });
 
   // Bildförhandsvisning
   previewUrl = signal<string | null>(null);
   previewName = signal('');
+
+  @HostListener('window:keydown', ['$event'])
+  onKeyDown(e: KeyboardEvent) {
+    const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    if (isInput) return;
+
+    if (e.ctrlKey || e.metaKey) {
+      if (e.key === 'x') {
+        e.preventDefault();
+        this.cutSelected();
+      } else if (e.key === 'v') {
+        e.preventDefault();
+        this.paste();
+      }
+    }
+    if (e.key === 'Delete') {
+      this.bulkDelete();
+    }
+  }
 
   ngOnInit() { this.load(); }
 
@@ -71,6 +94,7 @@ export class FileBrowserComponent implements OnInit {
         const flat: StoredFile[] = [];
         this.flattenEntries(map, '', flat);
         this.nav.allEntries.set(flat);
+        this.selectedPaths.update(s => { s.clear(); return s; });
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
@@ -88,6 +112,107 @@ export class FileBrowserComponent implements OnInit {
         this.flattenEntries(meta.content, fullName, out);
       }
     }
+  }
+
+  // ── Selection ────────────────────────────────────────────────────────────
+  toggleSelect(entry: StoredFile, event: Event) {
+    event.stopPropagation();
+    this.selectedPaths.update(set => {
+      if (set.has(entry.name)) set.delete(entry.name);
+      else set.add(entry.name);
+      return new Set(set);
+    });
+  }
+
+  toggleSelectAll() {
+    const current = this.nav.currentEntries();
+    this.selectedPaths.update(set => {
+      const allSelected = current.every(e => set.has(e.name));
+      if (allSelected) {
+        current.forEach(e => set.delete(e.name));
+      } else {
+        current.forEach(e => set.add(e.name));
+      }
+      return new Set(set);
+    });
+  }
+
+  isAllSelected(): boolean {
+    const current = this.nav.currentEntries();
+    return current.length > 0 && current.every(e => this.selectedPaths().has(e.name));
+  }
+
+  // ── Bulk Actions ─────────────────────────────────────────────────────────
+  bulkDelete() {
+    const paths = Array.from(this.selectedPaths());
+    if (!paths.length) return;
+    if (!confirm(`Ta bort ${paths.length} markerade objekt?`)) return;
+
+    this.loading.set(true);
+    this.api.bulkDelete(paths).subscribe({
+      next: () => {
+        this.setAction(`${paths.length} objekt borttagna`, true);
+        this.load();
+      },
+      error: (e) => {
+        this.loading.set(false);
+        this.setAction(`Fel: ${e.status}`, false);
+      }
+    });
+  }
+
+  cutSelected() {
+    const paths = Array.from(this.selectedPaths());
+    if (!paths.length) return;
+    this.clipboard.set({ paths, mode: 'cut' });
+    this.selectedPaths.update(s => { s.clear(); return s; });
+    this.setAction(`${paths.length} objekt klippta`, true);
+  }
+
+  cutEntry(entry: StoredFile) {
+    this.clipboard.set({ paths: [entry.name], mode: 'cut' });
+    this.setAction(`"${this.nav.shortName(entry.name)}" klippt`, true);
+  }
+
+  paste() {
+    const cb = this.clipboard();
+    if (!cb.paths.length || !cb.mode) return;
+
+    const target = this.nav.currentPath();
+    this.loading.set(true);
+
+    if (cb.mode === 'cut') {
+      this.api.bulkMove(cb.paths, target).subscribe({
+        next: () => {
+          this.setAction(`${cb.paths.length} objekt klistrades in`, true);
+          this.clipboard.set({ paths: [], mode: null });
+          this.load();
+        },
+        error: (e) => {
+          this.loading.set(false);
+          this.setAction(`Fel: ${e.status}`, false);
+        }
+      });
+    }
+  }
+
+  moveSelectedTo(targetPath: string) {
+    const paths = Array.from(this.selectedPaths());
+    if (!paths.length) return;
+
+    this.loading.set(true);
+    this.api.bulkMove(paths, targetPath).subscribe({
+      next: () => {
+        this.setAction(`${paths.length} objekt flyttades till ${targetPath || 'Roten'}`, true);
+        this.selectedPaths.update(s => { s.clear(); return s; });
+        this.showMoveMenu.set(false);
+        this.load();
+      },
+      error: (e) => {
+        this.loading.set(false);
+        this.setAction(`Fel: ${e.status}`, false);
+      }
+    });
   }
 
   // ── Icon helper ──────────────────────────────────────────────────────────
@@ -300,7 +425,8 @@ onDropOnFolder(e: DragEvent, targetEntry: StoredFile) {
 
   onFileSelected(files: FileList | null) {
     if (!files?.length) return;
-    const file = files[0];
+    const fileList = Array.from(files);
+    const targetPath = this.nav.currentPath();
 
     this.loading.set(true);
     this.api.bulkUpload(targetPath, fileList).subscribe({
@@ -309,15 +435,8 @@ onDropOnFolder(e: DragEvent, targetEntry: StoredFile) {
         this.load();
       },
       error: (err) => {
-        if (err.status === 409) {
-            this.api.replaceFile(fullPath, file).subscribe({
-                this.load();
-              },
-                this.loading.set(false);
-              }
-          } else {
-          }
-          this.loading.set(false);
+        this.loading.set(false);
+        this.setAction(`Fel vid uppladdning: ${err.status}`, false);
       },
     });
   }
