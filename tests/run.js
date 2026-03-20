@@ -3,6 +3,7 @@ import { isAdvanced as isGroup, printExampleCommands, startProgram } from "./inp
 import { registerApiFilesPost } from "./tests/v1-api-files-post.js";
 import { registerApiLogin } from "./tests/v1-api-login.js";
 import { registerIndexHtmlTests } from "./tests/v1-index-html.js";
+import { registerSignalR } from "./tests/v2-signalr.js";
 
 await startProgram(printHelp);
 
@@ -13,6 +14,10 @@ group("Vecka 1", () => {
     if (isGroup()) {
         registerApiLogin();
     }
+});
+
+group("Vecka 2", () => {
+    registerSignalR();
 });
 
 
