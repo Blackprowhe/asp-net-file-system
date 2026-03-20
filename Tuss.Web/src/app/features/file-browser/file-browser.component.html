@@ -1,0 +1,272 @@
+﻿<div class="browser-section">
+
+  <!-- Breadcrumbs & Toolbar -->
+  <div class="toolbar">
+    <div class="breadcrumbs">
+      @for (crumb of nav.breadcrumbs(); track crumb.path; let last = $last) {
+        @if (!last) {
+          <button class="breadcrumb-link" (click)="nav.navigateTo(crumb.path)">{{ crumb.label }}</button>
+          <span class="breadcrumb-sep"><icon-chevron-right [size]="15" /></span>
+        } @else {
+          <span class="breadcrumb-current">{{ crumb.label }}</span>
+        }
+      }
+    </div>
+
+    <div class="toolbar-actions">
+      <!-- Paste Button -->
+      @if (clipboard().mode === 'cut' && clipboard().paths.length > 0) {
+        <button class="btn btn-primary" (click)="paste()" [disabled]="loading()">
+          <span>Klistra in ({{ clipboard().paths.length }})</span>
+        </button>
+      }
+
+      <!-- "Ny" Meny -->
+      <div class="new-menu-container">
+        <button class="btn btn-primary" (click)="toggleNewMenu()" [disabled]="loading()">
+          <icon-plus [size]="15" />
+          <span>Ny</span>
+        </button>
+
+        @if (showNewMenu()) {
+          <div class="context-menu new-menu">
+            <button class="context-menu-item" (click)="triggerUpload(fileInput)">
+              <icon-upload [size]="15" />
+              <span>Ladda upp fil</span>
+            </button>
+            <button class="context-menu-item" (click)="startCreateFolder()">
+              <icon-folder [size]="15" />
+              <span>Ny mapp</span>
+            </button>
+          </div>
+          <div class="menu-backdrop" (click)="showNewMenu.set(false)"></div>
+        }
+        <input type="file" #fileInput style="display:none" multiple (change)="onFileSelected(fileInput.files)" />
+      </div>
+
+      <button class="btn btn-ghost btn-icon btn-sm"
+              (click)="load()"
+              [disabled]="loading()"
+              aria-label="Uppdatera"
+              title="Uppdatera">
+        <icon-reset [size]="15" />
+      </button>
+    </div>
+  </div>
+
+  <!-- Versions drawer -->
+  @if (versionsFor()) {
+    <app-file-versions
+      [fileName]="versionsFor()!"
+      [versions]="currentVersions()"
+      (closed)="closeVersions()"
+      (restored)="onRestored()"
+    />
+  }
+
+  <!-- Fil- och mappista med drag & drop -->
+  @if (loading() && nav.currentEntries().length === 0) {
+    <p class="muted">Laddar...</p>
+  } @else {
+    <!-- Bulk Bar -->
+    @if (selectedPaths().size > 0) {
+      <div class="bulk-bar card">
+        <span class="bulk-info">{{ selectedPaths().size }} markerade</span>
+        <div class="bulk-actions">
+          <!-- Move To Dropdown -->
+          <div class="move-menu-container">
+            <button class="btn btn-sm btn-ghost" (click)="showMoveMenu.set(!showMoveMenu())">
+              <span>Flytta till...</span>
+            </button>
+            @if (showMoveMenu()) {
+              <div class="context-menu move-menu">
+                <button class="context-menu-item" (click)="moveSelectedTo('')">
+                  <icon-folder [size]="15" />
+                  <span>Mina filer (Roten)</span>
+                </button>
+                @for (folder of nav.folders(); track folder.name) {
+                  @if (!selectedPaths().has(folder.name)) {
+                    <button class="context-menu-item" (click)="moveSelectedTo(folder.name)">
+                      <icon-folder [size]="15" />
+                      <span>{{ folder.name }}</span>
+                    </button>
+                  }
+                }
+              </div>
+              <div class="menu-backdrop" (click)="showMoveMenu.set(false)"></div>
+            }
+          </div>
+
+          <button class="btn btn-sm btn-ghost" (click)="cutSelected()">
+            <span>Klipp ut</span>
+          </button>
+          <button class="btn btn-sm btn-ghost action-danger" (click)="bulkDelete()">
+            <icon-trash [size]="15" />
+            <span>Ta bort</span>
+          </button>
+          <button class="btn btn-sm btn-ghost" (click)="selectedPaths().clear()">
+            <span>Avbryt</span>
+          </button>
+        </div>
+      </div>
+    }
+
+    <div class="card drop-zone"
+         [class.drag-over]="isDragOver()"
+         (dragover)="onDragOver($event)"
+         (dragleave)="onDragLeave($event)"
+         (drop)="onDrop($event)">
+
+      @if (nav.currentEntries().length === 0 && !isCreatingFolder()) {
+        <div class="empty-state">
+          <h2 class="font-serif">Inga filer här ännu</h2>
+          <p>Ladda upp din första fil, skapa en mapp, eller dra och missp filer hit.</p>
+        </div>
+      } @else {
+        <div class="file-list">
+          <!-- Header row with select all -->
+          <div class="file-row file-header">
+            <span class="file-select">
+              <input type="checkbox" [checked]="isAllSelected()" (change)="toggleSelectAll()" />
+            </span>
+            <span class="file-icon"></span>
+            <span class="file-name">Namn</span>
+            <span class="file-meta file-meta-size">Storlek</span>
+            <span class="file-meta file-meta-date">Ändrad</span>
+            <span class="file-actions"></span>
+          </div>
+
+          <!-- Inline folder creation row -->
+          @if (isCreatingFolder()) {
+            <div class="file-row inline-edit-row">
+              <span class="file-select"></span>
+              <span class="file-icon"><icon-folder [size]="15" /></span>
+              <input class="input-field inline-input"
+                     [ngModel]="newFolderName()"
+                     (ngModelChange)="newFolderName.set($event)"
+                     placeholder="Namnge mappen..."
+                     (keyup.enter)="confirmCreateFolder()"
+                     (keyup.esc)="cancelCreateFolder()" />
+              <div class="inline-actions">
+                <button class="btn btn-sm btn-primary" (click)="confirmCreateFolder()">Skapa</button>
+                <button class="btn btn-sm btn-ghost" (click)="cancelCreateFolder()">Avbryt</button>
+              </div>
+            </div>
+          }
+
+          @for (entry of nav.currentEntries(); track entry.name) {
+            <div class="file-row"
+                 [class.file-row-clickable]="!entry.file"
+                 [class.file-row-selected]="selectedPaths().has(entry.name)"
+                 [class.drag-over]="dropTarget() === entry.name"
+                 draggable="true"
+                 (dragstart)="onDragStart(entry, $event)"
+                 (dragover)="!entry.file ? onDragOverRow($event, entry) : null"
+                 (dragleave)="!entry.file ? onDragLeaveRow($event) : null"
+                 (drop)="!entry.file ? onDropOnFolder($event, entry) : null"
+                 (click)="!entry.file ? navigateToFolder(entry) : null">
+
+              <!-- Checkbox -->
+              <span class="file-select" (click)="$event.stopPropagation()">
+                <input type="checkbox"
+                       [checked]="selectedPaths().has(entry.name)"
+                       (change)="toggleSelect(entry, $event)" />
+              </span>
+
+              <!-- Filtypsikon -->
+              <span class="file-icon">
+                @switch (entry.file ? iconType(entry) : 'folder') {
+                  @case ('folder')  { <icon-folder  [size]="15" /> }
+                  @case ('image')   { <icon-image   [size]="15" /> }
+                  @case ('video')   { <icon-video   [size]="15" /> }
+                  @case ('code')    { <icon-code    [size]="15" /> }
+                  @case ('text')    { <icon-text    [size]="15" /> }
+                  @case ('archive') { <icon-archive [size]="15" /> }
+                  @default          { <icon-file    [size]="15" /> }
+                }
+              </span>
+
+              <!-- Namn — klickbart för mappar OCH bilder -->
+              <span class="file-name"
+                    [class.file-name-link]="isImage(entry)"
+                    (click)="onFileNameClick(entry, $event)">
+                {{ nav.shortName(entry.name) }}
+              </span>
+
+              <!-- Storlek — alltid 64px, tom för mappar -->
+              <span class="file-meta file-meta-size">
+                @if (entry.file) { {{ entry.bytes | fileSize }} }
+              </span>
+
+              <!-- Datum — alltid 140px -->
+              <span class="file-meta file-meta-date">{{ entry.changed }}</span>
+
+              <!--
+                Actions — alltid exakt 3 slots à 28px + 2×4px gap = 96px
+                Slot 1: versioner (fil)  | tomt (mapp)
+                Slot 2: ladda ned (fil)  | tomt (mapp)
+                Slot 3: ta bort (alltid)
+              -->
+              <span class="file-actions" (click)="$event.stopPropagation()">
+                @if (entry.file) {
+
+                  <!-- Slot 1: versioner -->
+                  <button class="btn btn-ghost btn-icon btn-sm" (click)="showVersions(entry)" title="Versioner">
+                    <icon-clock [size]="15" />
+                  </button>
+                  <!-- Slot 2: ladda ned -->
+                  <a class="btn btn-ghost btn-icon btn-sm" [href]="downloadUrl(entry.name)" [attr.download]="nav.shortName(entry.name)" title="Ladda ned">
+                    <icon-download [size]="15" />
+                  </a>
+                  <!-- Slot 3: ta bort -->
+                  <button class="btn btn-ghost btn-icon btn-sm action-danger" (click)="deleteFile(entry.name)" title="Ta bort">
+                    <icon-trash [size]="15" />
+                  </button>
+                } @else {
+                  <!-- Mapp: 2 tomma slots + klipp ut + ta bort -->
+                  <span class="action-spacer"></span>
+                  <span class="action-spacer"></span>
+                  <button class="btn btn-ghost btn-icon btn-sm" (click)="cutEntry(entry)" title="Klipp ut mapp">
+                    <icon-scissors [size]="15" />
+                  </button>
+                  <button class="btn btn-ghost btn-icon btn-sm action-danger" (click)="deleteFolder(entry.name)" title="Ta bort mapp">
+                    <icon-trash [size]="15" />
+                  </button>
+                }
+              </span>
+
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  @if (actionMessage()) {
+    <p class="status-message"
+       [class.status-success]="actionSuccess()"
+       [class.status-error]="!actionSuccess()">
+      {{ actionMessage() }}
+    </p>
+  }
+
+</div>
+
+<!-- Bildförhandsvisning -->
+@if (previewUrl()) {
+  <div class="preview-backdrop" (click)="closePreview()">
+    <div class="preview-header" (click)="$event.stopPropagation()">
+      <span class="preview-title">{{ previewName() }}</span>
+      <a class="btn btn-ghost btn-sm" style="color:rgba(255,255,255,0.7)" [href]="previewUrl()!" [attr.download]="previewName()" title="Ladda ned">
+        <icon-download [size]="15" />
+      </a>
+      <button class="btn btn-ghost btn-icon btn-sm" style="color:rgba(255,255,255,0.7)" (click)="closePreview()" aria-label="Stäng förhandsvisning">
+        <icon-cross [size]="15" />
+      </button>
+    </div>
+    <img class="preview-img"
+         [src]="previewUrl()!"
+         [alt]="previewName()"
+         (click)="$event.stopPropagation()" />
+  </div>
+}

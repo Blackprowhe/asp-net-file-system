@@ -1,0 +1,63 @@
+// Shell layout
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg-canvas);
+}
+
+.shell-body {
+  display: flex;
+  flex: 1;
+}
+
+// Topbar
+.topbar {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 var(--space-6);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-brand {
+  font-size: var(--text-2xl);
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+// Sidebar
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+  height: calc(100vh - 48px);
+  position: sticky;
+  top: 48px;
+  overflow-y: auto;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
+}
+
+// Main content
+.main-content {
+  flex: 1;
+  padding: var(--space-8);
+  max-width: 1100px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+
+  @media (max-width: 768px) {
+    padding: var(--space-4);
+  }
+}
+
