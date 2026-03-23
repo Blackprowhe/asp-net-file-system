@@ -9,18 +9,29 @@
 <body>
     <aside class="sidebar">
         <h2> Filer</h2>
+        <input id="newFileName" placeholder="nyfil.txt"/>
+        <button onclick="createFile()">Skapa Fil</button>
+
+         <input type="file" id="uploadFileInput" />
+    <button id="uploadButton">Ladda upp fil</button>
+    
+
         <div id="fileList" class="file-list"></div>
     </aside>
 
     <main class="main">
-        <div class="topbar">
-            <h2 id="fileName">Ingen fil vald</h2>
-            <button id="saveButton">Spara</button>
-        </div>
+       <div class="topbar">
+    <h2 id="fileName">Ingen fil vald</h2>
+
+    <div class="actions">
+        <button id="saveButton">Spara</button>
+        <button id="deleteButton">Radera</button>
+    </div>
+</div>
 
         <textarea id="editor" placeholder="Välj en fil för att visa innehåll..."></textarea>
     </main>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
     <script src="script.js"></script>
     
 </body>

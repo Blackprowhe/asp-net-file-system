@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.SignalR;
 using TestApp.Services;
-
+using TestApp.Helpers;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -10,7 +11,11 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 builder.Services.AddSingleton<FileService>();
 
+builder.Services.AddSignalR();
+
 var app = builder.Build();
+
+app.MapHub<EventsHub>("/api/events/signalr");
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -72,7 +77,7 @@ app.MapMethods("/api/files/{**path}", new[] { "HEAD" }, (string path, FileServic
     return Results.Ok();
 });
 
-app.MapPost("/api/files/{**path}", async (string path, HttpRequest request, FileService fileService) =>
+app.MapPost("/api/files/{**path}", async (string path, HttpRequest request, FileService fileService, IHubContext<EventsHub> hub) =>
 {
     if (fileService.FileExists(path))
     {
@@ -80,7 +85,10 @@ app.MapPost("/api/files/{**path}", async (string path, HttpRequest request, File
     }
 
     await fileService.SaveFileAsync(path, request);
+     await hub.Clients.All.SendAsync("FileCreated", path);
     return Results.Ok();
+
+    
 });
 
 app.MapPut("/api/files/{**path}", async (string path, HttpRequest request, FileService fileService) =>
