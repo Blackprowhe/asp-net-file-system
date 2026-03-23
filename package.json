@@ -5,10 +5,7 @@
   "main": "run.js",
   "scripts": {
     "generate": "node tests/generate.js",
-    "test": "node tests/run.js",
-    "build": "cd Tuss.Web && npm install --no-audit && npx ng build",
-    "dev": "concurrently --names \"server,angular\" --prefix-colors \"cyan,magenta\" \"dotnet run --project ./Tuss.Server/Tuss.Server.csproj\" \"cd Tuss.Web && npx ng serve --open\"",
-    "start": "dotnet run --project ./Tuss.Server/Tuss.Server.csproj"
+    "test": "node tests/run.js"
   },
   "keywords": [],
   "author": "",

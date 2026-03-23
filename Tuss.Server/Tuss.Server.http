@@ -1,6 +1,0 @@
-@Tuss.Server_HostAddress = http://localhost:5075
-
-GET {{Tuss.Server_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
