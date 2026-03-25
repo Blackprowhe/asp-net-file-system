@@ -22,3 +22,14 @@ public class FileItemDto
     [JsonPropertyName("content")]
     public Dictionary<string, FileItemDto>? Content { get; set; }
 }
+
+public class FileEventDto
+{
+     [JsonPropertyName("type")]
+    public int Type { get; set; }
+
+    [JsonPropertyName("path")]
+    public string Path { get; set; } = "";
+}
+
+    

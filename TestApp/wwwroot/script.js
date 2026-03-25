@@ -4,7 +4,6 @@ const connection = new signalR.HubConnectionBuilder()
     .withUrl("/api/events/signalr")
     .build();
 
-    
 const fileList = document.getElementById("fileList");
 const fileName = document.getElementById("fileName");
 const editor = document.getElementById("editor");
@@ -12,6 +11,28 @@ const saveButton = document.getElementById("saveButton");
 const deleteButton = document.getElementById("deleteButton");
 const uploadButton = document.getElementById("uploadButton");
 const uploadFileInput = document.getElementById("uploadFileInput");
+
+connection.on("FileCreated", async function (path) {
+    await loadFiles();
+});
+
+connection.on("FileUpdated", async function (path) {
+    await loadFiles();
+
+    if (currentFile === path) {
+        await openFile(path);
+    }
+});
+
+connection.on("FileDeleted", async function (path) {
+    if (currentFile === path) {
+        currentFile = null;
+        fileName.textContent = "Ingen fil vald";
+        editor.value = "";
+    }
+
+    await loadFiles();
+});
 
 async function loadFiles() {
     const response = await fetch("/api/files");
@@ -71,35 +92,43 @@ async function saveFile() {
     alert("Filen sparades.");
     await loadFiles();
 }
+
 async function deleteFile() {
     if (!currentFile) {
         alert("Välj en fil först.");
         return;
     }
+
     const confirmed = confirm(`Är du säker på att du vill radera filen "${currentFile}"?`);
     if (!confirmed) {
         return;
     }
+
     const response = await fetch(`/api/files/${currentFile}`, {
         method: "DELETE"
     });
+
     if (!response.ok) {
         alert("Kunde inte radera filen.");
         return;
     }
+
     alert("Filen raderades.");
     currentFile = null;
     fileName.textContent = "Ingen fil vald";
     editor.value = "";
     await loadFiles();
 }
+
 async function uploadFile() {
     const file = uploadFileInput.files[0];
     if (!file) {
         alert("Välj en fil att ladda upp.");
         return;
     }
+
     const content = await file.text();
+
     const response = await fetch(`/api/files/${file.name}`, {
         method: "POST",
         headers: {
@@ -112,18 +141,18 @@ async function uploadFile() {
         alert("En fil med det namnet finns redan.");
         return;
     }
+
     if (!response.ok) {
         alert("Kunde inte ladda upp filen.");
         return;
     }
+
     uploadFileInput.value = "";
     await loadFiles();
     await openFile(file.name);
 
     alert("Filen laddades upp.");
-    await loadFiles();
 }
-
 
 async function createFile() {
     const input = document.getElementById("newFileName");
@@ -158,5 +187,9 @@ async function createFile() {
 saveButton.addEventListener("click", saveFile);
 deleteButton.addEventListener("click", deleteFile);
 uploadButton.addEventListener("click", uploadFile);
+
+connection.start()
+    .then(() => console.log("SignalR connected"))
+    .catch(err => console.error("SignalR error:", err));
 
 loadFiles();

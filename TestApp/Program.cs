@@ -2,7 +2,17 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.SignalR;
 using TestApp.Services;
 using TestApp.Helpers;
+using TestApp.Models;
+
+// skapar builder
 var builder = WebApplication.CreateBuilder(args);
+
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = long.MaxValue;
+});
+
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -13,23 +23,25 @@ builder.Services.AddSingleton<FileService>();
 
 builder.Services.AddSignalR();
 
+
+// bygger appen
 var app = builder.Build();
 
 app.MapHub<EventsHub>("/api/events/signalr");
-
+// gör det möjligt att använda wwwroot som root för statiska filer
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.MapGet("/health", () => "Server is running");
 
-
-app.MapGet("/api/files", (FileService fileService) =>
+// Hämtar alla filer och mappar i root och returnerar dem som JSON
+app.MapGet("/api/files", (FileService fileService,IHubContext<EventsHub> hub) =>
 {
     var rootListing = fileService.GetDirectoryListing("");
     return rootListing is null ? Results.NotFound() : Results.Json(rootListing);
 });
 
-app.MapGet("/api/files/{**path}", (string path, FileService fileService, HttpContext context) =>
+app.MapGet("/api/files/{**path}", (string path, FileService fileService, HttpContext context,IHubContext<EventsHub> hub ) =>
 {
     if (fileService.FileExists(path))
     {
@@ -59,7 +71,7 @@ app.MapGet("/api/files/{**path}", (string path, FileService fileService, HttpCon
     return Results.NotFound();
 });
 
-app.MapMethods("/api/files/{**path}", new[] { "HEAD" }, (string path, FileService fileService, HttpContext context) =>
+app.MapMethods("/api/files/{**path}", new[] { "HEAD" }, (string path, FileService fileService, HttpContext context,IHubContext<EventsHub> hub   ) =>
 {
     var metadata = fileService.GetFileMetadata(path);
 
@@ -77,7 +89,11 @@ app.MapMethods("/api/files/{**path}", new[] { "HEAD" }, (string path, FileServic
     return Results.Ok();
 });
 
-app.MapPost("/api/files/{**path}", async (string path, HttpRequest request, FileService fileService, IHubContext<EventsHub> hub) =>
+app.MapPost("/api/files/{**path}", async (
+    string path,
+    HttpRequest request,
+    FileService fileService,
+    IHubContext<EventsHub> hub) =>
 {
     if (fileService.FileExists(path))
     {
@@ -85,21 +101,50 @@ app.MapPost("/api/files/{**path}", async (string path, HttpRequest request, File
     }
 
     await fileService.SaveFileAsync(path, request);
-     await hub.Clients.All.SendAsync("FileCreated", path);
-    return Results.Ok();
 
-    
+    await hub.Clients.All.SendAsync("Event",0, path);
+     
+   
+
+    return Results.Ok();
 });
 
-app.MapPut("/api/files/{**path}", async (string path, HttpRequest request, FileService fileService) =>
+
+
+app.MapPut("/api/files/{**path}", async (
+    string path,
+    HttpRequest request,
+    FileService fileService,
+    IHubContext<EventsHub> hub) =>
 {
+    var existed = fileService.FileExists(path);
+
     await fileService.SaveFileAsync(path, request);
+
+    await hub.Clients.All.SendAsync("Event", existed ? 1 : 0, path);
+
     return Results.Ok();
 });
 
-app.MapDelete("/api/files/{**path}", (string path, FileService fileService) =>
+app.MapDelete("/api/files/{**path}", async (
+    string path,
+    FileService fileService,
+    IHubContext<EventsHub> hub) =>
 {
+    var fileExists = fileService.FileExists(path);
+    var directoryExists = fileService.DirectoryExists(path);
+
     fileService.DeleteFile(path);
+
+    if (fileExists)
+    {
+        await hub.Clients.All.SendAsync("Event", 2, path);
+    }
+    else if (directoryExists)
+    {
+        await hub.Clients.All.SendAsync("Event", 7, path);
+    }
+
     return Results.Ok();
 });
 

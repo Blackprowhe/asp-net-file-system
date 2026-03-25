@@ -71,8 +71,8 @@ public class FileService
 
             return new FileItemDto
             {
-                Created = info.CreationTime.ToString("yyyy-MM-dd HH:mm:ss"),
-                Changed = info.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                Created = info.CreationTimeUtc.ToString("yyyy-MM-dd HH:mm:ss"),
+                Changed = info.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm:ss"),
                 File = true,
                 Bytes = info.Length,
                 Extension = info.Extension
@@ -85,8 +85,8 @@ public class FileService
 
             return new FileItemDto
             {
-                Created = info.CreationTime.ToString("yyyy-MM-dd HH:mm:ss"),
-                Changed = info.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                Created = info.CreationTimeUtc.ToString("yyyy-MM-dd HH:mm:ss"),
+                Changed = info.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm:ss"),
                 File = false,
                 Bytes = 0,
                 Content = GetDirectoryListing(path)
@@ -116,8 +116,8 @@ public class FileService
 
                 result[info.Name] = new FileItemDto
                 {
-                    Created = info.CreationTime.ToString("yyyy-MM-dd HH:mm:ss"),
-                    Changed = info.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                    Created = info.CreationTimeUtc.ToString("yyyy-MM-dd HH:mm:ss"),
+                    Changed = info.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm:ss"),
                     File = true,
                     Bytes = info.Length,
                     Extension = info.Extension
@@ -130,8 +130,8 @@ public class FileService
 
                 result[info.Name] = new FileItemDto
                 {
-                    Created = info.CreationTime.ToString("yyyy-MM-dd HH:mm:ss"),
-                    Changed = info.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"),
+                    Created = info.CreationTimeUtc.ToString("yyyy-MM-dd HH:mm:ss"),
+                    Changed = info.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm:ss"),
                     File = false,
                     Bytes = 0,
                     Content = GetDirectoryListing(relativePath)

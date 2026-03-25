@@ -10,7 +10,7 @@ public static class ContentTypeHelper
 
         if (!provider.TryGetContentType(fileName, out var contentType))
         {
-            return "application/octet-stream";
+            return "text/plain; charset=UTF-8";
         }
 
         if (contentType.StartsWith("text/") || contentType == "application/json")
