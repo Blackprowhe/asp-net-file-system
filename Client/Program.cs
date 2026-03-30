@@ -28,12 +28,14 @@ public class Program
 
         var url = baseUrl + "/api/files";
 
+        //  Skicka en GET-förfrågan
+        var client = new HttpClient();
+        HttpResponseMessage response;
+
         try
         {
-            var client = new HttpClient();
-            var response = await client.GetAsync(url);
+            response = await client.GetAsync(url);
 
-            // 3. Om servern svarar men inte är okej
             if (!response.IsSuccessStatusCode)
             {
                 Environment.Exit(1);
@@ -41,8 +43,16 @@ public class Program
         }
         catch
         {
-            // 4. Om request kraschar (ogiltig URL / ingen server)
             Environment.Exit(1);
+            return;
+        }
+
+        if (args[0] == "pull")
+        {
+            Console.WriteLine("pull körs");
+
+            var content = await response.Content.ReadAsStringAsync();
+            Console.WriteLine(content);
         }
     }
 }
