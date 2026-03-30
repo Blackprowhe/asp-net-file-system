@@ -62,10 +62,10 @@ async function uploadFile(file, localPath) {
 async function createFile(file, contentType, content) {
     try {
         let url = `/api/files/`;
-        if (apiLoginExists()) {
-            const user = getUserInfo();
-            url += `${user.name}/test/`;
-        }
+        // if (apiLoginExists()) {
+        //     const user = getUserInfo();
+        //     url += `${user.name}/test/`;
+        // }
         url += file;
         const r = await POST.everything(url, content, contentType);
         if (r.status != 409) assertOk(r);
