@@ -6,68 +6,66 @@ public class Program
 {
     public static async Task Main(string[] args)
     {
-        // kontrollera att minst 2 argument finns (kommando + url)
+
         if (args.Length < 2)
         {
             Console.WriteLine("ingen url hittades");
-            Environment.Exit(1); // avsluta programmet med felkod
+            Environment.Exit(1);
         }
 
-        var command = args[0]; // första argumentet: pull eller push
-        var baseUrl = args[1]; // andra argumentet: serveradress
+        var command = args[0];
+        var baseUrl = args[1];
 
-        // kontrollera att kommandot är giltigt
         if (command != "pull" && command != "push")
         {
             Console.WriteLine("ogiltigt kommando");
             Environment.Exit(1);
         }
 
-        // lägg till http eller https om det saknas
         if (!baseUrl.StartsWith("http://") && !baseUrl.StartsWith("https://"))
         {
             if (baseUrl.Contains("localhost"))
-                baseUrl = "http://" + baseUrl; // localhost använder http
+                baseUrl = "http://" + baseUrl;
             else
-                baseUrl = "https://" + baseUrl; // annars https
+                baseUrl = "https://" + baseUrl;
         }
 
-        using var client = new HttpClient(); // skapa HTTP-klient
+        using var client = new HttpClient();
 
-        // logga in om användarnamn och lösenord finns
+        var root = Directory.GetCurrentDirectory();
+
         if (args.Length >= 4)
         {
-            var loginUrl = baseUrl + "/api/login"; // login endpoint
+            var loginUrl = baseUrl + "/api/login";
 
             var loginData = new
             {
-                username = args[2], // användarnamn
-                password = args[3]  // lösenord
+                username = args[2],
+                password = args[3]
             };
 
-            var json = JsonSerializer.Serialize(loginData); // gör om till JSON
+            var json = JsonSerializer.Serialize(loginData);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            await client.PostAsync(loginUrl, content); // skicka login request
+            await client.PostAsync(loginUrl, content);
         }
 
         HttpResponseMessage response;
 
         try
         {
-            // hämta lista med filer från servern
             response = await client.GetAsync(baseUrl + "/api/files");
 
             if (!response.IsSuccessStatusCode)
-                Environment.Exit(1); // avsluta om servern svarar med fel
+                Environment.Exit(1);
         }
         catch
         {
-            Environment.Exit(1); // avsluta om servern inte nås
+            Environment.Exit(1);
             return;
         }
 
-        var serverPaths = new HashSet<string>(); // lista med filer på servern
+        var serverPaths = new HashSet<string>();
 
         // =====================
         // PULL
@@ -76,16 +74,15 @@ public class Program
         {
             Console.WriteLine("pull körs");
 
-            var content = await response.Content.ReadAsStringAsync(); // läs JSON från servern
+            var content = await response.Content.ReadAsStringAsync();
 
-            List<JsonElement> files = new(); // lista med filer
+            Dictionary<string, JsonElement> files = new();
 
             try
             {
-                // om servern inte skickar {} så försök läsa lista
                 if (content.Trim() != "{}")
                 {
-                    files = JsonSerializer.Deserialize<List<JsonElement>>(content) ?? new();
+                    files = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(content) ?? new();
                 }
             }
             catch (Exception ex)
@@ -95,48 +92,46 @@ public class Program
                 return;
             }
 
-            // loopa igenom alla filer från servern
-            foreach (var file in files)
+            foreach (var kvp in files)
             {
-                // kontrollera att "path" finns
+                var file = kvp.Value;
+
                 if (!file.TryGetProperty("path", out var pathProp))
                     continue;
 
-                var path = pathProp.GetString(); // hämta filens sökväg
+                var path = pathProp.GetString();
                 if (path == null) continue;
 
                 Console.WriteLine($"Hämtar: {path}");
 
-                var fileUrl = baseUrl + "/api/files/" + path; // url till filen
-                var fileResponse = await client.GetAsync(fileUrl); // hämta filen
+                var fileUrl = baseUrl + "/api/files/" + path;
+                var fileResponse = await client.GetAsync(fileUrl);
 
                 if (!fileResponse.IsSuccessStatusCode)
                     continue;
 
-                var bytes = await fileResponse.Content.ReadAsByteArrayAsync(); // läs fil som bytes
+                var bytes = await fileResponse.Content.ReadAsByteArrayAsync();
 
-                var directory = Path.GetDirectoryName(path); // hämta mapp
+                var directory = Path.GetDirectoryName(path);
                 if (!string.IsNullOrEmpty(directory))
-                    Directory.CreateDirectory(directory); // skapa mapp om den saknas
+                    Directory.CreateDirectory(directory);
 
-                File.WriteAllBytes(path, bytes); // spara fil lokalt
+                File.WriteAllBytes(path, bytes);
 
                 var normalizedPath = path.Replace("/", Path.DirectorySeparatorChar.ToString());
-                serverPaths.Add(normalizedPath); // spara i lista
+                serverPaths.Add(normalizedPath);
             }
 
-            // hämta alla lokala filer
             var localFiles = Directory.GetFiles(
-                Directory.GetCurrentDirectory(),
+                root,
                 "*",
                 SearchOption.AllDirectories
             );
 
-            // ta bort lokala filer som inte finns på servern
             foreach (var fullPath in localFiles)
             {
                 var relativePath = Path.GetRelativePath(
-                    Directory.GetCurrentDirectory(),
+                    root,
                     fullPath
                 ).Replace("/", Path.DirectorySeparatorChar.ToString());
 
@@ -155,15 +150,15 @@ public class Program
         {
             Console.WriteLine("push körs");
 
-            var content = await response.Content.ReadAsStringAsync(); // läs serverns filer
+            var content = await response.Content.ReadAsStringAsync();
 
-            List<JsonElement> files = new();
+            Dictionary<string, JsonElement> files = new();
 
             try
             {
                 if (content.Trim() != "{}")
                 {
-                    files = JsonSerializer.Deserialize<List<JsonElement>>(content) ?? new();
+                    files = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(content) ?? new();
                 }
             }
             catch
@@ -171,69 +166,106 @@ public class Program
                 Console.WriteLine("Kunde inte läsa JSON");
             }
 
-            // fyll serverPaths med filer från servern
-            foreach (var file in files)
-            {
-                if (!file.TryGetProperty("path", out var pathProp))
-                    continue;
+           ExtractPaths(files, "", serverPaths);
 
-                var path = pathProp.GetString();
-                if (path == null) continue;
-
-                serverPaths.Add(path.Replace("\\", "/"));
-            }
-
-            // hämta alla lokala filer
             var localFiles = Directory.GetFiles(
-                Directory.GetCurrentDirectory(),
+                root,
                 "*",
                 SearchOption.AllDirectories
             );
 
-            // ladda upp alla lokala filer
             foreach (var fullPath in localFiles)
             {
-                var relativePath = Path.GetRelativePath(
-                    Directory.GetCurrentDirectory(),
-                    fullPath
-                ).Replace("\\", "/");
+                var relativePath = Path.GetRelativePath(root, fullPath)
+                    .Replace("\\", "/");
+
+                if (relativePath.StartsWith("bin/") ||
+                    relativePath.StartsWith("obj/"))
+                {
+                    continue;
+                }
 
                 Console.WriteLine($"Skickar: {relativePath}");
 
                 var fileUrl = baseUrl + "/api/files/" + relativePath;
 
-                var bytes = await File.ReadAllBytesAsync(fullPath); // läs fil som bytes
-                var fileContent = new ByteArrayContent(bytes);
+                var bytes = await File.ReadAllBytesAsync(fullPath);
 
-                var result = await client.PutAsync(fileUrl, fileContent); // skicka till servern
+                var fileContent = new ByteArrayContent(bytes);
+                fileContent.Headers.ContentType =
+                    new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+
+                var result = await client.PutAsync(fileUrl, fileContent);
 
                 if (!result.IsSuccessStatusCode)
                 {
                     Console.WriteLine($"Fel vid upload: {relativePath}");
+                    Console.WriteLine($"Status: {result.StatusCode}");
+                    continue;
                 }
             }
+        }
 
-            // ta bort filer på servern som inte finns lokalt
-            foreach (var serverPath in serverPaths)
+        // =====================
+        // DELETE på server
+        // =====================
+
+        var localFilesForDelete = Directory.GetFiles(
+            root,
+            "*",
+            SearchOption.AllDirectories
+        );
+
+       if (command == "pull")
+{
+    foreach (var serverPath in serverPaths)
+    {
+        var normalizedServerPath = serverPath.Replace("\\", "/");
+
+        var existsLocally = localFilesForDelete.Any(fullPath =>
+        {
+            var relativePath = Path.GetRelativePath(root, fullPath)
+                .Replace("\\", "/");
+
+            return relativePath.Equals(normalizedServerPath, StringComparison.OrdinalIgnoreCase);
+        });
+
+        if (!existsLocally)
+        {
+            Console.WriteLine($"Tar bort från server: {serverPath}");
+
+            var deleteUrl = baseUrl + "/api/files/" + normalizedServerPath;
+            await client.DeleteAsync(deleteUrl);
+        }
+    }
+}
+    static void ExtractPaths(Dictionary<string, JsonElement> files, string currentPath, HashSet<string> paths)
+{
+    foreach (var kvp in files)
+    {
+        var name = kvp.Key;
+        var file = kvp.Value;
+
+        var fullPath = string.IsNullOrEmpty(currentPath)
+            ? name
+            : currentPath + "/" + name;
+
+        paths.Add(fullPath);
+
+        if (file.TryGetProperty("file", out var isFileProp) && !isFileProp.GetBoolean())
+        {
+            if (file.TryGetProperty("content", out var contentProp))
             {
-                var existsLocally = localFiles.Any(fullPath =>
+                var subFiles = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(contentProp.GetRawText());
+                if (subFiles != null)
                 {
-                    var relativePath = Path.GetRelativePath(
-                        Directory.GetCurrentDirectory(),
-                        fullPath
-                    ).Replace("\\", "/");
-
-                    return relativePath == serverPath;
-                });
-
-                if (!existsLocally)
-                {
-                    Console.WriteLine($"Tar bort från server: {serverPath}");
-
-                    var deleteUrl = baseUrl + "/api/files/" + serverPath;
-                    await client.DeleteAsync(deleteUrl);
+                    ExtractPaths(subFiles, fullPath, paths);
                 }
             }
         }
     }
 }
+}       
+}
+
+
