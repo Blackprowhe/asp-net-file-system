@@ -159,10 +159,38 @@ public class FileService
     public void DeleteFile(string path)
     {
         var fullPath = GetFullPath(path);
+        var storageRoot = Path.GetFullPath(_storagePath);
 
         if (File.Exists(fullPath))
         {
             File.Delete(fullPath);
+            RemoveEmptyParentDirectories(Path.GetDirectoryName(fullPath), storageRoot);
+            return;
+        }
+
+        if (Directory.Exists(fullPath))
+        {
+            Directory.Delete(fullPath, recursive: true);
+            RemoveEmptyParentDirectories(Path.GetDirectoryName(fullPath), storageRoot);
+        }
+    }
+
+    static void RemoveEmptyParentDirectories(string? dir, string storageRoot)
+    {
+        var current = dir;
+        while (!string.IsNullOrEmpty(current))
+        {
+            var normalized = Path.GetFullPath(current);
+            if (string.Equals(normalized, storageRoot, StringComparison.OrdinalIgnoreCase))
+                break;
+            if (!Directory.Exists(normalized))
+                break;
+            if (Directory.EnumerateFileSystemEntries(normalized).Any())
+                break;
+
+            var parent = Path.GetDirectoryName(normalized);
+            Directory.Delete(normalized);
+            current = parent;
         }
     }
 }

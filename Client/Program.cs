@@ -1,269 +1,308 @@
-﻿using System.Net.Http;
+﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
 public class Program
 {
-    public static async Task Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
-
         if (args.Length < 2)
         {
             Console.WriteLine("ingen url hittades");
-            Environment.Exit(1);
+            return 1;
         }
 
         var command = args[0];
         var baseUrl = args[1];
 
-        if (command != "pull" && command != "push")
+        if (command is not ("pull" or "push"))
         {
             Console.WriteLine("ogiltigt kommando");
-            Environment.Exit(1);
+            return 1;
         }
 
-        if (!baseUrl.StartsWith("http://") && !baseUrl.StartsWith("https://"))
+        if (!baseUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            && !baseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
-            if (baseUrl.Contains("localhost"))
-                baseUrl = "http://" + baseUrl;
-            else
-                baseUrl = "https://" + baseUrl;
+            baseUrl = baseUrl.Contains("localhost", StringComparison.OrdinalIgnoreCase)
+                ? "http://" + baseUrl
+                : "https://" + baseUrl;
         }
+
+        baseUrl = baseUrl.TrimEnd('/');
 
         using var client = new HttpClient();
 
-        var root = Path.Combine(Path.GetTempPath(), "myclient", Guid.NewGuid().ToString());
-        Directory.CreateDirectory(root);
-        Directory.SetCurrentDirectory(root);
         if (args.Length >= 4)
         {
-            var loginUrl = baseUrl + "/api/login";
-
-            var loginData = new
+            var loginJson = JsonSerializer.Serialize(new { username = args[2], password = args[3] });
+            var content = new StringContent(loginJson, Encoding.UTF8, "application/json");
+            try
             {
-                username = args[2],
-                password = args[3]
-            };
-
-            var json = JsonSerializer.Serialize(loginData);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            await client.PostAsync(loginUrl, content);
+                await client.PostAsync(baseUrl + "/api/login", content);
+            }
+            catch
+            {
+                return 1;
+            }
         }
 
-        HttpResponseMessage response;
+        var root = Directory.GetCurrentDirectory();
 
+        HttpResponseMessage listResponse;
         try
         {
-            response = await client.GetAsync(baseUrl + "/api/files");
-
-            if (!response.IsSuccessStatusCode)
-                Environment.Exit(1);
+            listResponse = await client.GetAsync(baseUrl + "/api/files");
+            if (!listResponse.IsSuccessStatusCode)
+                return 1;
         }
         catch
         {
-            Environment.Exit(1);
-            return;
+            return 1;
         }
 
-        var serverPaths = new HashSet<string>();
+        var body = await listResponse.Content.ReadAsStringAsync();
 
-        string Normalize(string path) 
+        Dictionary<string, JsonElement> rootListing;
+        try
         {
-            return path
-                .Replace("\\", "/")
-                .Replace("./", "")   // 🔥 fixar Windows-problemet
-                .Trim('/')
-                .Trim();
+            rootListing = string.IsNullOrWhiteSpace(body) || body.Trim() == "{}"
+                ? new Dictionary<string, JsonElement>()
+                : JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(body) ?? new();
+        }
+        catch
+        {
+            return 1;
         }
 
-        // =====================
-        // PULL
-        // =====================
         if (command == "pull")
         {
-            Console.WriteLine("pull körs");
+            var serverFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            CollectFilePaths(rootListing, "", serverFiles);
 
-            var content = await response.Content.ReadAsStringAsync();
-
-            Console.WriteLine("SERVER RESPONSE:");
-            Console.WriteLine(content);
-
-            Dictionary<string, JsonElement> files = new();
-
-            try
+            foreach (var relPath in serverFiles)
             {
-                if (content.Trim() != "{}")
+                var url = baseUrl + "/api/files/" + Uri.EscapeDataString(relPath.Replace('\\', '/'));
+                HttpResponseMessage fileResponse;
+                try
                 {
-                    files = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(content) ?? new();
+                    fileResponse = await client.GetAsync(url);
                 }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("JSON ERROR:");
-                Console.WriteLine(ex.Message);
-                return;
-            }
-
-            ExtractPaths(files, "", serverPaths);
-            serverPaths = serverPaths
-                .Select(p => Normalize(p).Trim('/').Trim().ToLower())
-                .ToHashSet();
-
-            foreach (var serverPath in serverPaths)
-            {
-                var fileUrl = baseUrl + "/api/files/" + serverPath;
-                var fileResponse = await client.GetAsync(fileUrl);
+                catch
+                {
+                    return 1;
+                }
 
                 if (!fileResponse.IsSuccessStatusCode)
                     continue;
 
                 var bytes = await fileResponse.Content.ReadAsByteArrayAsync();
-
-                var fullPath = Path.Combine(root, serverPath.Replace("/", Path.DirectorySeparatorChar.ToString()));
-
-                var directory = Path.GetDirectoryName(fullPath);
-                if (!string.IsNullOrEmpty(directory))
-                    Directory.CreateDirectory(directory);
-
-                File.WriteAllBytes(fullPath, bytes);
-            }
-
-            var localFiles = Directory.GetFiles(root, "*", SearchOption.AllDirectories);
-
-            foreach (var fullPath in localFiles)
-            {
-                var relativePath = Normalize(Path.GetRelativePath(root, fullPath))
-                    .Trim('/')
-                    .Trim()
-                    .ToLower();
-
-                if (string.IsNullOrWhiteSpace(relativePath))
+                var dest = SafePathUnderRoot(root, relPath);
+                if (dest is null)
                     continue;
 
-                if (!serverPaths.Contains(relativePath))
-                {
-                    Console.WriteLine($"Tar bort: {relativePath}");
+                var parent = Path.GetDirectoryName(dest);
+                if (!string.IsNullOrEmpty(parent))
+                    Directory.CreateDirectory(parent);
+
+                await File.WriteAllBytesAsync(dest, bytes);
+            }
+
+            foreach (var fullPath in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
+            {
+                var rel = NormalizeRelativePath(Path.GetRelativePath(root, fullPath));
+                if (string.IsNullOrEmpty(rel) || rel.Contains("..", StringComparison.Ordinal))
+                    continue;
+
+                if (!serverFiles.Contains(rel))
                     File.Delete(fullPath);
-                }
             }
 
-            // 🔥 CLEANUP TOMMA MAPPAR (korrekt version)
-            bool deleted;
-
-            do
-            {
-                deleted = false;
-
-                var directories = Directory.GetDirectories(root, "*", SearchOption.AllDirectories)
-                    .OrderByDescending(d => d.Length);
-
-                foreach (var dir in directories)
-                {
-                    if (!Directory.EnumerateFileSystemEntries(dir).Any())
-                    {
-                        Directory.Delete(dir);
-                        deleted = true;
-                    }
-                }
-
-            } while (deleted);
+            PruneEmptyDirectories(root);
         }
-
-        // =====================
-        // PUSH
-        // =====================
-        else if (command == "push")
+        else
         {
-            Console.WriteLine("push körs");
+            var serverFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            CollectFilePaths(rootListing, "", serverFiles);
 
-            var content = await response.Content.ReadAsStringAsync();
-
-            Dictionary<string, JsonElement> files = new();
-
-            try
+            var localFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var fullPath in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
             {
-                if (content.Trim() != "{}")
-                {
-                    files = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(content) ?? new();
-                }
-            }
-            catch
-            {
-                Console.WriteLine("Kunde inte läsa JSON");
-            }
-
-            ExtractPaths(files, "", serverPaths);
-
-            var localFiles = Directory.GetFiles(root, "*", SearchOption.AllDirectories);
-
-            foreach (var fullPath in localFiles)
-            {
-                var relativePath = Path.GetFileName(fullPath).ToLower();
-
-                // 🔥 IGNORERA SYSTEMMAPPar
-                if (relativePath.StartsWith("bin/") ||
-                    relativePath.StartsWith("obj/") ||
-                    relativePath.StartsWith("storage/") ||
-                    relativePath.StartsWith("wwwroot/") ||
-                    relativePath.StartsWith("tests/") ||
-                    relativePath.EndsWith(".cs") ||
-                    relativePath.EndsWith(".csproj"))
-                {
+                var rel = NormalizeRelativePath(Path.GetRelativePath(root, fullPath));
+                if (string.IsNullOrEmpty(rel) || rel.Contains("..", StringComparison.Ordinal))
                     continue;
-                }
+                localFiles.Add(rel);
+            }
 
-                Console.WriteLine($"Skickar: {relativePath}");
+            foreach (var relPath in serverFiles)
+            {
+                if (localFiles.Contains(relPath))
+                    continue;
 
-                var fileUrl = baseUrl + "/api/files/" + relativePath;
-
-                var bytes = await File.ReadAllBytesAsync(fullPath);
-
-                var fileContent = new ByteArrayContent(bytes);
-                fileContent.Headers.ContentType =
-                    new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-
-                var result = await client.PutAsync(fileUrl, fileContent);
-
-                if (!result.IsSuccessStatusCode)
+                var url = baseUrl + "/api/files/" + Uri.EscapeDataString(relPath.Replace('\\', '/'));
+                try
                 {
-                    Console.WriteLine($"Fel vid upload: {relativePath}");
-                    Console.WriteLine($"Status: {result.StatusCode}");
+                    var del = await client.DeleteAsync(url);
+                    if (!del.IsSuccessStatusCode)
+                        return 1;
+                }
+                catch
+                {
+                    return 1;
                 }
             }
-        }
 
-        // =====================
-        // ExtractPaths (FIXED)
-        // =====================
-        static void ExtractPaths(Dictionary<string, JsonElement> files, string currentPath, HashSet<string> paths)
-        {
-            foreach (var kvp in files)
+            if (localFiles.Count == 0)
             {
-                var name = kvp.Key;
-                var file = kvp.Value;
-
-                var fullPath = string.IsNullOrEmpty(currentPath)
-                    ? name
-                    : currentPath + "/" + name;
-
-                if (file.TryGetProperty("file", out var isFileProp) && isFileProp.GetBoolean())
+                for (var i = 0; i < 32; i++)
                 {
-                    paths.Add(fullPath);
-                }
-
-                if (file.TryGetProperty("file", out var isDirProp) && !isDirProp.GetBoolean())
-                {
-                    if (file.TryGetProperty("content", out var contentProp))
+                    HttpResponseMessage again;
+                    try
                     {
-                        var subFiles = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(contentProp.GetRawText());
-                        if (subFiles != null)
+                        again = await client.GetAsync(baseUrl + "/api/files");
+                        if (!again.IsSuccessStatusCode)
+                            return 1;
+                    }
+                    catch
+                    {
+                        return 1;
+                    }
+
+                    var text = await again.Content.ReadAsStringAsync();
+                    Dictionary<string, JsonElement> listing;
+                    try
+                    {
+                        listing = string.IsNullOrWhiteSpace(text) || text.Trim() == "{}"
+                            ? new Dictionary<string, JsonElement>()
+                            : JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(text) ?? new();
+                    }
+                    catch
+                    {
+                        return 1;
+                    }
+
+                    if (listing.Count == 0)
+                        break;
+
+                    foreach (var key in listing.Keys.ToList())
+                    {
+                        var url = baseUrl + "/api/files/" + Uri.EscapeDataString(key.Replace('\\', '/'));
+                        try
                         {
-                            ExtractPaths(subFiles, fullPath, paths);
+                            var del = await client.DeleteAsync(url);
+                            if (!del.IsSuccessStatusCode)
+                                return 1;
+                        }
+                        catch
+                        {
+                            return 1;
                         }
                     }
                 }
             }
+
+            foreach (var relPath in localFiles)
+            {
+                var localPath = SafePathUnderRoot(root, relPath);
+                if (localPath is null || !File.Exists(localPath))
+                    continue;
+
+                var url = baseUrl + "/api/files/" + Uri.EscapeDataString(relPath.Replace('\\', '/'));
+                var bytes = await File.ReadAllBytesAsync(localPath);
+                using var putContent = new ByteArrayContent(bytes);
+                putContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+
+                HttpResponseMessage putResponse;
+                try
+                {
+                    putResponse = await client.PutAsync(url, putContent);
+                }
+                catch
+                {
+                    return 1;
+                }
+
+                if (!putResponse.IsSuccessStatusCode)
+                    return 1;
+            }
         }
+
+        return 0;
+    }
+
+    static string NormalizeRelativePath(string relative) =>
+        relative.Replace('\\', '/').TrimStart('/');
+
+    static string? SafePathUnderRoot(string root, string relative)
+    {
+        relative = relative.Replace('\\', '/').TrimStart('/');
+        foreach (var segment in relative.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (segment is "." or "..")
+                return null;
+        }
+
+        var combined = Path.GetFullPath(Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar)));
+        var fullRoot = Path.GetFullPath(root);
+        if (!combined.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+            return null;
+        if (combined.Length > fullRoot.Length
+            && combined[fullRoot.Length] != Path.DirectorySeparatorChar)
+            return null;
+
+        return combined;
+    }
+
+    static void CollectFilePaths(
+        Dictionary<string, JsonElement> nodes,
+        string prefix,
+        HashSet<string> filePaths)
+    {
+        foreach (var (name, el) in nodes)
+        {
+            var fullPath = string.IsNullOrEmpty(prefix) ? name : prefix + "/" + name;
+
+            if (!el.TryGetProperty("file", out var fileProp))
+                continue;
+
+            if (fileProp.GetBoolean())
+            {
+                filePaths.Add(fullPath);
+                continue;
+            }
+
+            if (!el.TryGetProperty("content", out var contentProp))
+                continue;
+
+            Dictionary<string, JsonElement>? sub;
+            try
+            {
+                sub = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(contentProp.GetRawText());
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (sub is { Count: > 0 })
+                CollectFilePaths(sub, fullPath, filePaths);
+        }
+    }
+
+    static void PruneEmptyDirectories(string root)
+    {
+        bool changed;
+        do
+        {
+            changed = false;
+            foreach (var dir in Directory.GetDirectories(root, "*", SearchOption.AllDirectories)
+                         .OrderByDescending(d => d.Length))
+            {
+                if (Directory.EnumerateFileSystemEntries(dir).Any())
+                    continue;
+                Directory.Delete(dir);
+                changed = true;
+            }
+        } while (changed);
     }
 }
