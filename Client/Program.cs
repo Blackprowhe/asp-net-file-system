@@ -1,6 +1,6 @@
-﻿using System.Net.Http; // används för att skicka HTTP requests
-using System.Text; // används för encoding (t.ex. JSON)
-using System.Text.Json; // används för att hantera JSON
+﻿using System.Net.Http;
+using System.Text;
+using System.Text.Json;
 
 public class Program
 {
@@ -32,8 +32,9 @@ public class Program
 
         using var client = new HttpClient();
 
-        var root = Directory.GetCurrentDirectory();
-
+        var root = Path.Combine(Path.GetTempPath(), "myclient", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(root);
+        Directory.SetCurrentDirectory(root);
         if (args.Length >= 4)
         {
             var loginUrl = baseUrl + "/api/login";
@@ -67,6 +68,15 @@ public class Program
 
         var serverPaths = new HashSet<string>();
 
+        string Normalize(string path)
+        {
+            return path
+                .Replace("\\", "/")
+                .Replace("./", "")   // 🔥 fixar Windows-problemet
+                .Trim('/')
+                .Trim();
+        }
+
         // =====================
         // PULL
         // =====================
@@ -75,6 +85,9 @@ public class Program
             Console.WriteLine("pull körs");
 
             var content = await response.Content.ReadAsStringAsync();
+
+            Console.WriteLine("SERVER RESPONSE:");
+            Console.WriteLine(content);
 
             Dictionary<string, JsonElement> files = new();
 
@@ -92,19 +105,14 @@ public class Program
                 return;
             }
 
-            foreach (var kvp in files)
+            ExtractPaths(files, "", serverPaths);
+            serverPaths = serverPaths
+                .Select(p => Normalize(p).Trim('/').Trim().ToLower())
+                .ToHashSet();
+
+            foreach (var serverPath in serverPaths)
             {
-                var file = kvp.Value;
-
-                if (!file.TryGetProperty("path", out var pathProp))
-                    continue;
-
-                var path = pathProp.GetString();
-                if (path == null) continue;
-
-                Console.WriteLine($"Hämtar: {path}");
-
-                var fileUrl = baseUrl + "/api/files/" + path;
+                var fileUrl = baseUrl + "/api/files/" + serverPath;
                 var fileResponse = await client.GetAsync(fileUrl);
 
                 if (!fileResponse.IsSuccessStatusCode)
@@ -112,28 +120,26 @@ public class Program
 
                 var bytes = await fileResponse.Content.ReadAsByteArrayAsync();
 
-                var directory = Path.GetDirectoryName(path);
+                var fullPath = Path.Combine(root, serverPath.Replace("/", Path.DirectorySeparatorChar.ToString()));
+
+                var directory = Path.GetDirectoryName(fullPath);
                 if (!string.IsNullOrEmpty(directory))
                     Directory.CreateDirectory(directory);
 
-                File.WriteAllBytes(path, bytes);
-
-                var normalizedPath = path.Replace("/", Path.DirectorySeparatorChar.ToString());
-                serverPaths.Add(normalizedPath);
+                File.WriteAllBytes(fullPath, bytes);
             }
 
-            var localFiles = Directory.GetFiles(
-                root,
-                "*",
-                SearchOption.AllDirectories
-            );
+            var localFiles = Directory.GetFiles(root, "*", SearchOption.AllDirectories);
 
             foreach (var fullPath in localFiles)
             {
-                var relativePath = Path.GetRelativePath(
-                    root,
-                    fullPath
-                ).Replace("/", Path.DirectorySeparatorChar.ToString());
+                var relativePath = Normalize(Path.GetRelativePath(root, fullPath))
+                    .Trim('/')
+                    .Trim()
+                    .ToLower();
+
+                if (string.IsNullOrWhiteSpace(relativePath))
+                    continue;
 
                 if (!serverPaths.Contains(relativePath))
                 {
@@ -141,6 +147,27 @@ public class Program
                     File.Delete(fullPath);
                 }
             }
+
+            // 🔥 CLEANUP TOMMA MAPPAR (korrekt version)
+            bool deleted;
+
+            do
+            {
+                deleted = false;
+
+                var directories = Directory.GetDirectories(root, "*", SearchOption.AllDirectories)
+                    .OrderByDescending(d => d.Length);
+
+                foreach (var dir in directories)
+                {
+                    if (!Directory.EnumerateFileSystemEntries(dir).Any())
+                    {
+                        Directory.Delete(dir);
+                        deleted = true;
+                    }
+                }
+
+            } while (deleted);
         }
 
         // =====================
@@ -166,21 +193,22 @@ public class Program
                 Console.WriteLine("Kunde inte läsa JSON");
             }
 
-           ExtractPaths(files, "", serverPaths);
+            ExtractPaths(files, "", serverPaths);
 
-            var localFiles = Directory.GetFiles(
-                root,
-                "*",
-                SearchOption.AllDirectories
-            );
+            var localFiles = Directory.GetFiles(root, "*", SearchOption.AllDirectories);
 
             foreach (var fullPath in localFiles)
             {
-                var relativePath = Path.GetRelativePath(root, fullPath)
-                    .Replace("\\", "/");
+                var relativePath = Path.GetFileName(fullPath).ToLower();
 
+                // 🔥 IGNORERA SYSTEMMAPPar
                 if (relativePath.StartsWith("bin/") ||
-                    relativePath.StartsWith("obj/"))
+                    relativePath.StartsWith("obj/") ||
+                    relativePath.StartsWith("storage/") ||
+                    relativePath.StartsWith("wwwroot/") ||
+                    relativePath.StartsWith("tests/") ||
+                    relativePath.EndsWith(".cs") ||
+                    relativePath.EndsWith(".csproj"))
                 {
                     continue;
                 }
@@ -201,71 +229,41 @@ public class Program
                 {
                     Console.WriteLine($"Fel vid upload: {relativePath}");
                     Console.WriteLine($"Status: {result.StatusCode}");
-                    continue;
                 }
             }
         }
 
         // =====================
-        // DELETE på server
+        // ExtractPaths (FIXED)
         // =====================
-
-        var localFilesForDelete = Directory.GetFiles(
-            root,
-            "*",
-            SearchOption.AllDirectories
-        );
-
-       if (command == "pull")
-{
-    foreach (var serverPath in serverPaths)
-    {
-        var normalizedServerPath = serverPath.Replace("\\", "/");
-
-        var existsLocally = localFilesForDelete.Any(fullPath =>
+        static void ExtractPaths(Dictionary<string, JsonElement> files, string currentPath, HashSet<string> paths)
         {
-            var relativePath = Path.GetRelativePath(root, fullPath)
-                .Replace("\\", "/");
-
-            return relativePath.Equals(normalizedServerPath, StringComparison.OrdinalIgnoreCase);
-        });
-
-        if (!existsLocally)
-        {
-            Console.WriteLine($"Tar bort från server: {serverPath}");
-
-            var deleteUrl = baseUrl + "/api/files/" + normalizedServerPath;
-            await client.DeleteAsync(deleteUrl);
-        }
-    }
-}
-    static void ExtractPaths(Dictionary<string, JsonElement> files, string currentPath, HashSet<string> paths)
-{
-    foreach (var kvp in files)
-    {
-        var name = kvp.Key;
-        var file = kvp.Value;
-
-        var fullPath = string.IsNullOrEmpty(currentPath)
-            ? name
-            : currentPath + "/" + name;
-
-        paths.Add(fullPath);
-
-        if (file.TryGetProperty("file", out var isFileProp) && !isFileProp.GetBoolean())
-        {
-            if (file.TryGetProperty("content", out var contentProp))
+            foreach (var kvp in files)
             {
-                var subFiles = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(contentProp.GetRawText());
-                if (subFiles != null)
+                var name = kvp.Key;
+                var file = kvp.Value;
+
+                var fullPath = string.IsNullOrEmpty(currentPath)
+                    ? name
+                    : currentPath + "/" + name;
+
+                if (file.TryGetProperty("file", out var isFileProp) && isFileProp.GetBoolean())
                 {
-                    ExtractPaths(subFiles, fullPath, paths);
+                    paths.Add(fullPath);
+                }
+
+                if (file.TryGetProperty("file", out var isDirProp) && !isDirProp.GetBoolean())
+                {
+                    if (file.TryGetProperty("content", out var contentProp))
+                    {
+                        var subFiles = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(contentProp.GetRawText());
+                        if (subFiles != null)
+                        {
+                            ExtractPaths(subFiles, fullPath, paths);
+                        }
+                    }
                 }
             }
         }
     }
 }
-}       
-}
-
-
