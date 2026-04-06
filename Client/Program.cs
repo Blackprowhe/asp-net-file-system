@@ -68,7 +68,7 @@ public class Program
 
         var serverPaths = new HashSet<string>();
 
-        string Normalize(string path)
+        string Normalize(string path) 
         {
             return path
                 .Replace("\\", "/")
