@@ -1,4 +1,6 @@
 let currentFile = null;
+let isViewingHistory = false;
+let isSaving = false;
 
 const connection = new signalR.HubConnectionBuilder()
     .withUrl("/api/events/signalr")
@@ -12,26 +14,33 @@ const deleteButton = document.getElementById("deleteButton");
 const uploadButton = document.getElementById("uploadButton");
 const uploadFileInput = document.getElementById("uploadFileInput");
 
-connection.on("FileCreated", async function (path) {
-    await loadFiles();
-});
+connection.on("Event", async function (type, path) {
+    console.log("SignalR event:", type, path);
 
-connection.on("FileUpdated", async function (path) {
-    await loadFiles();
+
+   const normalizedPath = path.replace(/\/$/, "");
+
+if (currentPath && !normalizedPath.startsWith(currentPath.replace(/\/$/, ""))) {
+    return;
+}
+     if (isViewingHistory) return;
+
+     if (isSaving) return;
+
+    
+    // uppdatera listan
+    await loadFiles(currentPath);
 
     if (currentFile === path) {
-        await openFile(path);
+        if (type === 2) {
+            // fil borttagen
+            currentFile = null;
+            fileName.textContent = "Ingen fil vald";
+            editor.value = "";
+       
+            
+        }
     }
-});
-
-connection.on("FileDeleted", async function (path) {
-    if (currentFile === path) {
-        currentFile = null;
-        fileName.textContent = "Ingen fil vald";
-        editor.value = "";
-    }
-
-    await loadFiles();
 });
 
 let currentPath = "";
@@ -114,6 +123,8 @@ async function openFile(path) {
         return;
     }
 
+    isViewingHistory = false;
+
     // 🔥 om bild
     if (path.match(/\.(png|jpg|jpeg|gif)$/i)) {
     const blob = await response.blob();
@@ -152,6 +163,15 @@ async function saveFile() {
         return;
     }
 
+    if (isViewingHistory) {
+        const confirmed = confirm("Du redigerar en gammal version. Vill du skapa en ny version?");
+        if (!confirmed) return;
+    }
+
+      isViewingHistory = false;
+      isSaving = true;
+
+
     const response = await fetch(`/api/files/${currentFile}`, {
         method: "PUT",
         headers: {
@@ -162,11 +182,16 @@ async function saveFile() {
 
     if (!response.ok) {
         alert("Kunde inte spara filen.");
+            isSaving = false;
         return;
     }
+     await new Promise(r => setTimeout(r, 100));
+
+     await openFile(currentFile);
 
     alert("Filen sparades.");
-    await loadFiles();
+    await loadFiles(currentPath);
+        isSaving = true;
 }
 
 async function deleteFile() {
@@ -193,7 +218,7 @@ async function deleteFile() {
     currentFile = null;
     fileName.textContent = "Ingen fil vald";
     editor.value = "";
-    await loadFiles();
+    await loadFiles(currentPath);
 }
 
 async function uploadFile() {
@@ -240,9 +265,10 @@ async function loadHistory(path) {
         const btn = document.createElement("button");
          btn.innerText = `Version ${version.version}`;
 
-         btn.onclick = () => {
-            document.getElementById("editor").value = version.content;
-         };
+        btn.onclick = () => {
+    editor.value = version.content;
+    isViewingHistory = true;
+};
 
          container.appendChild(btn);
     });
@@ -309,10 +335,12 @@ console.log("RESPONSE:", text);
     
 
     alert("Mapp skapad!");
-    await loadFiles();
+    await loadFiles(currentPath);
 }
 function goBack() {
     if (!currentPath) return; // redan i root
+
+    isViewingHistory = false;
 
     // dela upp path
     const parts = currentPath.split("/").filter(x => x);

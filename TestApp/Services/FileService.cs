@@ -169,21 +169,23 @@ public class FileService
         }
 
         // 🔥 HISTORIK (NY KOD)
+        using var memoryStream = new MemoryStream();
+        await request.Body.CopyToAsync(memoryStream);
+
+        var bytes = memoryStream.ToArray();
+        var newContent = System.Text.Encoding.UTF8.GetString(bytes);
+
         if (File.Exists(fullPath))
         {
-            var oldContent = await File.ReadAllTextAsync(fullPath);
-
             var latestVersion = await _context.FileHistories
                 .Where(f => f.FilePath == path)
-                .OrderByDescending(f => f.Version)
-                .Select(f => f.Version)
-                .FirstOrDefaultAsync();
+                .MaxAsync(f => (int?)f.Version) ?? 0;
 
             var history = new FileHistory
             {
                 FilePath = path,
                 Version = latestVersion + 1,
-                Content = oldContent,
+                Content = newContent, // 🔥 rätt content
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -191,8 +193,11 @@ public class FileService
             await _context.SaveChangesAsync();
         }
 
-        await using var fileStream = new FileStream(fullPath, FileMode.Create, FileAccess.Write);
-        await request.Body.CopyToAsync(fileStream);
+        // skriv filen EFTER
+        await File.WriteAllBytesAsync(fullPath, bytes);
+
+        
+        
     }
 
     public void DeleteFile(string path)
