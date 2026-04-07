@@ -18,6 +18,6 @@ public static class ContentTypeHelper
             return $"{contentType}; charset=UTF-8";
         }
 
-        return contentType;
+        return contentType.Split(';')[0];
     }
 }

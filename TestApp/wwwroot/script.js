@@ -113,10 +113,36 @@ async function openFile(path) {
         return;
     }
 
-    const text = await response.text();
-    editor.value = text;
+    // 🔥 om bild
+    if (path.match(/\.(png|jpg|jpeg|gif)$/i)) {
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+
+    editor.style.display = "none";
+
+    let img = document.getElementById("imagePreview");
+
+    if (!img) {
+        img = document.createElement("img");
+        img.id = "imagePreview";
+        img.style.maxWidth = "100%";
+        document.querySelector(".main").appendChild(img);
+    }
+
+    img.src = url;
+    img.style.display = "block";
+    return;
 }
 
+    // 🔥 annars text
+    const text = await response.text();
+
+    const img = document.getElementById("imagePreview");
+    if (img) img.style.display = "none";
+
+    editor.style.display = "block";
+    editor.value = text;
+}
 async function saveFile() {
     if (!currentFile) {
         alert("Välj en fil först.");
@@ -240,7 +266,7 @@ async function createFile() {
     }
     
 
-   const response = await fetch(`/api/files/${folderName}/`, {
+   const response = await fetch(`/api/files/${currentPath + folderName}/`, {
     method: "POST"
 });
 
@@ -263,6 +289,20 @@ console.log("RESPONSE:", text);
 
     alert("Mapp skapad!");
     await loadFiles();
+}
+function goBack() {
+    if (!currentPath) return; // redan i root
+
+    // dela upp path
+    const parts = currentPath.split("/").filter(x => x);
+
+    // ta bort sista mappen
+    parts.pop();
+
+    // bygg ihop igen
+    const newPath = parts.length ? parts.join("/") + "/" : "";
+
+    loadFiles(newPath);
 }
 
 saveButton.addEventListener("click", saveFile);
