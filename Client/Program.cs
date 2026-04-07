@@ -24,7 +24,7 @@ public class Program
             return 1;
         }
 
-        
+
         // koden kollar så att inget http eller https finns i url:en, och lägger till http om localhost finns i url:en
 
 
@@ -37,7 +37,7 @@ public class Program
         }
         //trimmar ner onödiga snedstreck i slutet av url:en
         baseUrl = baseUrl.TrimEnd('/');
-        
+
         using var client = new HttpClient();
         // login sker om args är fyra eller mindre än fyra, och args[2] och args[3] används som username och password,
         //  och skickas i en json body till /api/login, om något går fel returneras 1
@@ -56,7 +56,7 @@ public class Program
         }
         //koden hämtar directoryt och sparar i root
         var root = Directory.GetCurrentDirectory();
-        
+
         // koden hämtar listan av filer och mappar från servern genom att göra en GET request till /api/files,
         //  och sparar svaret i listResponse, om något går fel returneras 1
         HttpResponseMessage listResponse;
@@ -87,13 +87,13 @@ public class Program
         //om kommandot är pull så hämtas alla filer från servern och sparas lokalt,
         //  och alla filer som inte finns på servern tas bort lokalt
         if (command == "pull")
-        {  
-            
-             // koden samlar alla filvägar från serverns listing i en HashSet serverFiles,
-        //  och använder CollectFilePaths för att traversera listingens struktur
+        {
+
+            // koden samlar alla filvägar från serverns listing i en HashSet serverFiles,
+            //  och använder CollectFilePaths för att traversera listingens struktur
             var serverFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             CollectFilePaths(rootListing, "", serverFiles);
-            
+
             // koden loopar igenom alla filvägar i serverFiles, och för varje filväg görs en GET request till /api/files/{filväg} för att hämta filens innehåll,
             //  och sparar filen lokalt under samma relativa väg, om något går fel returneras 1,
             //  och om filen inte finns på servern fortsätter loopen
@@ -109,7 +109,7 @@ public class Program
                 {
                     return 1;
                 }
-               // om filen inte finns på servern fortsätter loopen
+                // om filen inte finns på servern fortsätter loopen
                 if (!fileResponse.IsSuccessStatusCode)
                     continue;
                 // koden läser filens innehåll som en byte array och sparar den lokalt
@@ -161,7 +161,7 @@ public class Program
             foreach (var fullPath in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
 
             {   // denna koden gör sökvägen säker och relativ och kollar så att den inte är tom eller innehåller "..", 
-            // och om den är det så fortsätter loopen, annars läggs den till i localFiles
+                // och om den är det så fortsätter loopen, annars läggs den till i localFiles
                 var rel = NormalizeRelativePath(Path.GetRelativePath(root, fullPath));
                 if (string.IsNullOrEmpty(rel) || rel.Contains("..", StringComparison.Ordinal))
                     continue;
@@ -174,7 +174,10 @@ public class Program
             //  för att ta bort filen från servern, om något går
             //  fel returneras 1
             foreach (var relPath in serverFiles)
-            {
+
+
+            {   // om filen finns både på servern och lokalt så fortsätter loopen, annars görs en DELETE request till /api/files/{filväg}
+                //  för att ta bort filen från servern, om något går fel returneras 1
                 if (localFiles.Contains(relPath))
                     continue;
 
@@ -193,11 +196,11 @@ public class Program
 
             if (localFiles.Count == 0)
             {   // Den här rackaren är en retry loop som försöker ta bort alla filer från servern upp till 32 gånger,
-            //  eller tills inga filer finns kvar på servern,
+                //  eller tills inga filer finns kvar på servern,
                 for (var i = 0; i < 32; i++)
                 {
                     // gör en GET request till /api/files för att hämta den uppdaterade
-                    //  listan av filer på servern, och sparar svaret i again, om något går fel
+                    //  listan av filer på servern, och sparar svaret, om något går fel
                     //  returneras 1
                     HttpResponseMessage again;
                     try
@@ -211,6 +214,9 @@ public class Program
                         return 1;
                     }
 
+                    // Läser JSON-svar från servern och konverterar till en dictionary.
+                    // Om svaret är tomt ("", "{}") används en tom dictionary för att undvika fel.
+                    // Annars deserialiseras JSON till Dictionary<string, JsonElement>.
                     var text = await again.Content.ReadAsStringAsync();
                     Dictionary<string, JsonElement> listing;
                     try
@@ -227,6 +233,10 @@ public class Program
                     if (listing.Count == 0)
                         break;
 
+
+                    // loopar igenom alla filer som finns på servern och gör en Delete Request
+                    // för att ta bort filer som inte ska finnas 
+                    // och bygger url säkert
                     foreach (var key in listing.Keys.ToList())
                     {
                         var url = baseUrl + "/api/files/" + Uri.EscapeDataString(key.Replace('\\', '/'));
@@ -244,17 +254,29 @@ public class Program
                 }
             }
 
+            // loopar igenom alla lokala filer.
             foreach (var relPath in localFiles)
             {
+                // gör sökvägen säker och relativ och kollar så att den inte är null.
+                // Och skippar ogiltiga paths och filer som inte finns.
                 var localPath = SafePathUnderRoot(root, relPath);
                 if (localPath is null || !File.Exists(localPath))
                     continue;
 
+
+                // bygger url säkert till servern och gör ett korekt api anrop
+                //läser hela filens innehåll som byte array och säger till servern
+                // att denna datan här är Raw...
+                // varför inte bara string? tänker ni säkert då XD detta är för att bytes funkar
+                // på allt eftersom allt i datavärlden är bytes, broken som fan XDD
                 var url = baseUrl + "/api/files/" + Uri.EscapeDataString(relPath.Replace('\\', '/'));
                 var bytes = await File.ReadAllBytesAsync(localPath);
                 using var putContent = new ByteArrayContent(bytes);
                 putContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 
+                // Skickar PUT-request till servern för att ladda upp filen.
+                // Om requesten misslyckas (fel statuskod eller exception)
+                // avslutas programmet med returnkod 1.
                 HttpResponseMessage putResponse;
                 try
                 {
@@ -273,9 +295,15 @@ public class Program
         return 0;
     }
 
+    // // Normaliserar sökvägar så att alla använder '/' istället för '\'
+    // och tar bort ledande snedstreck
     static string NormalizeRelativePath(string relative) =>
         relative.Replace('\\', '/').TrimStart('/');
 
+
+    // // Säkerställer att en relativ sökväg inte kan lämna root-mappen.
+    // Blockerar ".." och verifierar att den slutliga sökvägen ligger inom root.
+    // Returnerar null om sökvägen är ogiltig eller osäker.
     static string? SafePathUnderRoot(string root, string relative)
     {
         relative = relative.Replace('\\', '/').TrimStart('/');
@@ -296,6 +324,10 @@ public class Program
         return combined;
     }
 
+    // går igenom alla filer och mappar i serverns JSON och samlar alla filvägar i en lista.
+    // används för att veta vilka filer som finns på servern
+    //jämföra med lokala filer
+    // synca push och pull
     static void CollectFilePaths(
         Dictionary<string, JsonElement> nodes,
         string prefix,
@@ -305,18 +337,20 @@ public class Program
         {
             var fullPath = string.IsNullOrEmpty(prefix) ? name : prefix + "/" + name;
 
+            // koden kollar om det är en fil.
             if (!el.TryGetProperty("file", out var fileProp))
                 continue;
-
+            // om det är en fil lägg till i listan 
             if (fileProp.GetBoolean())
             {
                 filePaths.Add(fullPath);
                 continue;
             }
-
+            // och om det är en mapp så har den Coontent.
             if (!el.TryGetProperty("content", out var contentProp))
                 continue;
-
+            // koden försöker deserialisera content till en dictionary,
+            //  och om det inte går så fortsätter loopen,
             Dictionary<string, JsonElement>? sub;
             try
             {
@@ -326,12 +360,19 @@ public class Program
             {
                 continue;
             }
-
+            // funktionen anropar sig själv
+            // går ini mappar och mappar i mappar osv XD
             if (sub is { Count: > 0 })
                 CollectFilePaths(sub, fullPath, filePaths);
         }
     }
 
+
+    // // Rensar bort tomma mappar i hela katalogträdet.
+    // Kör i flera varv eftersom borttagning av en mapp kan göra dess förälder tom.
+    // Mappar sorteras så att de djupaste tas bort först.
+
+    // (LETADE EFTER DEN HÄR I 5 DAGAR...)
     static void PruneEmptyDirectories(string root)
     {
         bool changed;
