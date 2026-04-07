@@ -1,3 +1,4 @@
+namespace TestApp.Models;
 public class FileHistory
 {
     public int Id { get; set; }

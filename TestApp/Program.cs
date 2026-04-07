@@ -3,10 +3,13 @@ using Microsoft.AspNetCore.SignalR;
 using TestApp.Services;
 using TestApp.Helpers;
 using TestApp.Models;
+using Microsoft.EntityFrameworkCore;
 
 // skapar builder
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite("Data Source=files.db"));
 
 builder.WebHost.ConfigureKestrel(options =>
 {
