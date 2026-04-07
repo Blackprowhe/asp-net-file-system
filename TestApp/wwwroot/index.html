@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub Pro Max</title>¨
+    <title>GitHub Pro Max</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,6 +11,7 @@
         <h2> Filer</h2>
         <input id="newFileName" placeholder="nyfil.txt"/>
         <button onclick="createFile()">Skapa Fil</button>
+       <button onclick="createFolder()">Skapa Mapp</button>
 
          <input type="file" id="uploadFileInput" />
     <button id="uploadButton">Ladda upp fil</button>
@@ -21,6 +22,7 @@
 
     <main class="main">
        <div class="topbar">
+       <h2 id="currentPathDisplay">/</h2> 
     <h2 id="fileName">Ingen fil vald</h2>
 
     <div class="actions">

@@ -34,25 +34,72 @@ connection.on("FileDeleted", async function (path) {
     await loadFiles();
 });
 
-async function loadFiles() {
-    const response = await fetch("/api/files");
-    const data = await response.json();
+let currentPath = "";
 
-    fileList.innerHTML = "";
+async function loadFiles(path = "") {
+    currentPath = path;
 
-    for (const name in data) {
-        const item = document.createElement("div");
-        item.className = "file-item";
-        item.textContent = name;
+    document.getElementById("currentPathDisplay").textContent =
+    currentPath ? "/" + currentPath : "/";
 
-        item.addEventListener("click", async () => {
-            document.querySelectorAll(".file-item").forEach(x => x.classList.remove("active"));
-            item.classList.add("active");
-            await openFile(name);
-        });
+    const response = await fetch(`/api/files/${path}`);
+const result = await response.json();
 
-        fileList.appendChild(item);
+// 🔥 FIX
+let data = {};
+
+if (result && typeof result === "object") {
+    if (result.content && typeof result.content === "object") {
+        data = result.content;
+    } else {
+        data = result;
     }
+}
+console.log("PATH:", path);
+console.log("RESULT:", result);
+console.log("DATA:", data);
+
+fileList.innerHTML = "";
+
+// 🔥 visa tom mapp
+if (Object.keys(data).length === 0) {
+    const empty = document.createElement("div");
+    empty.textContent = "(Tom mapp)";
+    empty.style.opacity = "0.6";
+    empty.style.padding = "10px";
+    fileList.appendChild(empty);
+    return; // viktigt!
+}
+
+// 🔥 annars loopa filer/mappar
+for (const name in data) {
+    const item = document.createElement("div");
+    item.className = "file-item";
+
+    const fileData = data[name];
+
+    if (!fileData.file) {
+        item.textContent = "📁 " + name;
+    } else {
+        item.textContent = "📄 " + name;
+    }
+
+    item.addEventListener("click", async () => {
+        document.querySelectorAll(".file-item")
+            .forEach(x => x.classList.remove("active"));
+
+        item.classList.add("active");
+
+        if (!fileData.file) {
+            await loadFiles(currentPath + name + "/");
+            return;
+        }
+
+        await openFile(currentPath + name);
+    });
+
+    fileList.appendChild(item);
+}
 }
 
 async function openFile(path) {
@@ -162,8 +209,8 @@ async function createFile() {
         alert("Ange ett filnamn.");
         return;
     }
-
-    const response = await fetch(`/api/files/${name}`, {
+    
+    const response = await fetch(`/api/files/${currentPath + name}`, {
         method: "POST",
         body: ""
     });
@@ -180,8 +227,42 @@ async function createFile() {
 
     input.value = "";
 
+     await loadFiles(currentPath);
+    await openFile(currentPath + name);
+}
+
+ async function createFolder() {
+    const folderName = prompt("Ange mappnamn:");
+
+    if (!folderName) {
+        alert("Ange ett mappnamn.");
+        return;
+    }
+    
+
+   const response = await fetch(`/api/files/${folderName}/`, {
+    method: "POST"
+});
+
+console.log("STATUS:", response.status);
+
+const text = await response.text();
+console.log("RESPONSE:", text);
+
+    if (response.status === 409) {
+        alert("En mapp med det namnet finns redan.");
+        return;
+    }
+
+    if (!response.ok) {
+        alert("Kunde inte skapa mapp.");
+        return;
+    }
+
+    
+
+    alert("Mapp skapad!");
     await loadFiles();
-    await openFile(name);
 }
 
 saveButton.addEventListener("click", saveFile);

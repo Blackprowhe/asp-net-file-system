@@ -145,6 +145,16 @@ public class FileService
     public async Task SaveFileAsync(string path, HttpRequest request)
     {
         var fullPath = GetFullPath(path);
+        if (path.EndsWith("/"))
+        {
+            if (!Directory.Exists(fullPath))
+            {
+                Directory.CreateDirectory(fullPath);
+            }
+
+            return; // viktigt!
+        }
+
         var directory = Path.GetDirectoryName(fullPath);
 
         if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
