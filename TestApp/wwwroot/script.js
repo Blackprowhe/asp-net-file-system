@@ -103,6 +103,7 @@ for (const name in data) {
 }
 
 async function openFile(path) {
+    console.log("openFile körs", path);
     currentFile = path;
     fileName.textContent = path;
 
@@ -142,6 +143,8 @@ async function openFile(path) {
 
     editor.style.display = "block";
     editor.value = text;
+    console.log("laddar history för", path);
+    loadHistory(path);
 }
 async function saveFile() {
     if (!currentFile) {
@@ -226,7 +229,24 @@ async function uploadFile() {
 
     alert("Filen laddades upp.");
 }
+async function loadHistory(path) {
+    const res = await fetch(`/api/files/history/${path}`);
+    const history = await res.json();
 
+    const container = document.getElementById("history");
+    container.innerHTML ="";
+
+    history.forEach(version => {
+        const btn = document.createElement("button");
+         btn.innerText = `Version ${version.version}`;
+
+         btn.onclick = () => {
+            document.getElementById("editor").value = version.content;
+         };
+
+         container.appendChild(btn);
+    });
+}
 async function createFile() {
     const input = document.getElementById("newFileName");
     const name = input.value.trim();
@@ -269,6 +289,7 @@ async function createFile() {
    const response = await fetch(`/api/files/${currentPath + folderName}/`, {
     method: "POST"
 });
+
 
 console.log("STATUS:", response.status);
 

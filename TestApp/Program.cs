@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 using TestApp.Services;
 using TestApp.Helpers;
 using TestApp.Models;
+using TestApp.Data;
 using Microsoft.EntityFrameworkCore;
 
 // skapar builder
@@ -22,7 +23,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 });
 
-builder.Services.AddSingleton<FileService>();
+builder.Services.AddScoped<FileService>();
 
 builder.Services.AddSignalR();
 
@@ -72,6 +73,16 @@ app.MapGet("/api/files/{**path}", (string path, FileService fileService, HttpCon
     }
 
     return Results.NotFound();
+});
+
+app.MapGet("/api/files/history/{**path}", async (string path, AppDbContext context) =>
+{
+    var history = await context.FileHistories
+        .Where(f => f.FilePath == path)
+        .OrderBy(f => f.Version)
+        .ToListAsync();
+
+    return Results.Ok(history);
 });
 
 app.MapMethods("/api/files/{**path}", new[] { "HEAD" }, (string path, FileService fileService, HttpContext context,IHubContext<EventsHub> hub   ) =>

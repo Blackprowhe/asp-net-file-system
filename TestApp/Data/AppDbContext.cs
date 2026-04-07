@@ -1,3 +1,4 @@
+namespace TestApp.Data;
 using Microsoft.EntityFrameworkCore;
 using TestApp.Models;
 

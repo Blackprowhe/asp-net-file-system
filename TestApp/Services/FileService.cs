@@ -1,14 +1,19 @@
 using TestApp.Helpers;
 using TestApp.Models;
+using TestApp.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace TestApp.Services;
 
 public class FileService
 {
     private readonly string _storagePath;
+    private readonly AppDbContext _context;
 
-    public FileService()
+    public FileService(AppDbContext context)
     {
+        _context = context;
+
         _storagePath = Path.Combine(Directory.GetCurrentDirectory(), "Storage");
 
         if (!Directory.Exists(_storagePath))
@@ -19,7 +24,8 @@ public class FileService
 
     public string GetFullPath(string? relativePath)
     {
-        relativePath ??= "";
+        if (string.IsNullOrEmpty(relativePath))
+            relativePath = "";
         relativePath = relativePath.Replace('\\', '/').TrimStart('/');
 
         var fullPath = Path.GetFullPath(Path.Combine(_storagePath, relativePath));
@@ -145,14 +151,14 @@ public class FileService
     public async Task SaveFileAsync(string path, HttpRequest request)
     {
         var fullPath = GetFullPath(path);
+
         if (path.EndsWith("/"))
         {
             if (!Directory.Exists(fullPath))
             {
                 Directory.CreateDirectory(fullPath);
             }
-
-            return; // viktigt!
+            return;
         }
 
         var directory = Path.GetDirectoryName(fullPath);
@@ -160,6 +166,29 @@ public class FileService
         if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
         {
             Directory.CreateDirectory(directory);
+        }
+
+        // 🔥 HISTORIK (NY KOD)
+        if (File.Exists(fullPath))
+        {
+            var oldContent = await File.ReadAllTextAsync(fullPath);
+
+            var latestVersion = await _context.FileHistories
+                .Where(f => f.FilePath == path)
+                .OrderByDescending(f => f.Version)
+                .Select(f => f.Version)
+                .FirstOrDefaultAsync();
+
+            var history = new FileHistory
+            {
+                FilePath = path,
+                Version = latestVersion + 1,
+                Content = oldContent,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.FileHistories.Add(history);
+            await _context.SaveChangesAsync();
         }
 
         await using var fileStream = new FileStream(fullPath, FileMode.Create, FileAccess.Write);

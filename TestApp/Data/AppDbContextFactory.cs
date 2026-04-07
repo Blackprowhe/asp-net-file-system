@@ -1,7 +1,7 @@
+namespace TestApp.Data;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using TestApp.Data; // ← VIKTIG!
 
 public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 {

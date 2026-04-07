@@ -5,7 +5,7 @@ public class FileHistory
 
     public string FilePath { get; set; } = "";
 
-    public int version { get; set; }
+    public int Version { get; set; }
 
     public string Content { get; set; } = "";
 
