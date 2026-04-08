@@ -309,6 +309,7 @@ async function deleteFile() {
     currentFile = null;
     fileName.textContent = "Ingen fil vald";
     editor.value = "";
+    document.getElementById("history").innerHTML = "";
     await loadFiles(currentPath);
 }
 
@@ -366,7 +367,10 @@ async function loadHistory(path) {
 
     history.forEach(version => {
         const btn = document.createElement("button");
-         btn.innerText = `Version ${version.version}`;
+         const date = new Date(version.createdAt);
+         const formatted = date.toLocaleString("sv-SE");
+
+         btn.innerText = `Version ${version.version} (${formatted})`;
 
          //när man klickar laddas innehållet i editorn
          // och sätter isViewingHistory till true
