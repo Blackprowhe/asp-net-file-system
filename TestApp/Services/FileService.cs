@@ -5,6 +5,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace TestApp.Services;
 
+// Service-klass som hanterar all fil- och mapphantering.
+// Ansvarar för att läsa, skriva, ta bort och lista filer,
+// samt hantera versionshistorik via databasen.
 public class FileService
 {
     private readonly string _storagePath;
@@ -14,23 +17,30 @@ public class FileService
     {
         _context = context;
 
+        // Sätter root-mappen där alla filer lagras
         _storagePath = Path.Combine(Directory.GetCurrentDirectory(), "Storage");
 
+        // Skapar Storage-mappen om den inte finns
         if (!Directory.Exists(_storagePath))
         {
             Directory.CreateDirectory(_storagePath);
         }
     }
 
+    // Bygger en säker absolut sökväg från en relativ path.
+    // Skyddar mot directory traversal (t.ex. ../../).
     public string GetFullPath(string? relativePath)
     {
         if (string.IsNullOrEmpty(relativePath))
             relativePath = "";
+
+        // Normaliserar path (byter \ till / och tar bort leading /)
         relativePath = relativePath.Replace('\\', '/').TrimStart('/');
 
         var fullPath = Path.GetFullPath(Path.Combine(_storagePath, relativePath));
         var storageRoot = Path.GetFullPath(_storagePath);
 
+        // Säkerhetscheck: path måste ligga inom Storage
         if (fullPath != storageRoot &&
             !fullPath.StartsWith(storageRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
         {
@@ -40,16 +50,19 @@ public class FileService
         return fullPath;
     }
 
+    // Kollar om en fil finns
     public bool FileExists(string? path)
     {
         return File.Exists(GetFullPath(path));
     }
 
+    // Kollar om en mapp finns
     public bool DirectoryExists(string? path)
     {
         return Directory.Exists(GetFullPath(path));
     }
 
+    // Hämtar en fil (innehåll + MIME-typ)
     public FileContentResult? GetFile(string path)
     {
         var fullPath = GetFullPath(path);
@@ -62,15 +75,17 @@ public class FileService
         return new FileContentResult
         {
             Bytes = File.ReadAllBytes(fullPath),
-            ContentType = ContentTypeHelper.GetContentType(fullPath),
+            ContentType = ContentTypeHelper.GetContentType(fullPath), // MIME-typ
             Name = Path.GetFileName(fullPath)
         };
     }
 
+    // Hämtar metadata för fil eller mapp (används i HEAD/GET)
     public FileItemDto? GetFileMetadata(string path)
     {
         var fullPath = GetFullPath(path);
 
+        // Om det är en fil
         if (File.Exists(fullPath))
         {
             var info = new FileInfo(fullPath);
@@ -85,6 +100,7 @@ public class FileService
             };
         }
 
+        // Om det är en mapp
         if (Directory.Exists(fullPath))
         {
             var info = new DirectoryInfo(fullPath);
@@ -95,13 +111,14 @@ public class FileService
                 Changed = info.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm:ss"),
                 File = false,
                 Bytes = 0,
-                Content = GetDirectoryListing(path)
+                Content = GetDirectoryListing(path) // innehåll i mappen
             };
         }
 
         return null;
     }
 
+    // Hämtar alla filer/mappar i en katalog (rekursivt)
     public Dictionary<string, FileItemDto>? GetDirectoryListing(string? path)
     {
         var fullPath = GetFullPath(path);
@@ -116,6 +133,7 @@ public class FileService
 
         foreach (var entry in entries)
         {
+            // Om det är en fil
             if (File.Exists(entry))
             {
                 var info = new FileInfo(entry);
@@ -129,9 +147,12 @@ public class FileService
                     Extension = info.Extension
                 };
             }
+            // Om det är en mapp
             else if (Directory.Exists(entry))
             {
                 var info = new DirectoryInfo(entry);
+
+                // Gör path relativ igen
                 var relativePath = Path.GetRelativePath(_storagePath, entry).Replace('\\', '/');
 
                 result[info.Name] = new FileItemDto
@@ -140,7 +161,7 @@ public class FileService
                     Changed = info.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm:ss"),
                     File = false,
                     Bytes = 0,
-                    Content = GetDirectoryListing(relativePath)
+                    Content = GetDirectoryListing(relativePath) // rekursivt
                 };
             }
         }
@@ -148,10 +169,12 @@ public class FileService
         return result;
     }
 
+    // Sparar fil eller skapar mapp
     public async Task SaveFileAsync(string path, HttpRequest request)
     {
         var fullPath = GetFullPath(path);
 
+        // Om path slutar med "/" → skapa mapp
         if (path.EndsWith("/"))
         {
             if (!Directory.Exists(fullPath))
@@ -161,6 +184,7 @@ public class FileService
             return;
         }
 
+        // Säkerställ att parent-mapp finns
         var directory = Path.GetDirectoryName(fullPath);
 
         if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
@@ -168,13 +192,14 @@ public class FileService
             Directory.CreateDirectory(directory);
         }
 
-        // 🔥 HISTORIK (NY KOD)
+        // Läser request body (filens innehåll)
         using var memoryStream = new MemoryStream();
         await request.Body.CopyToAsync(memoryStream);
 
         var bytes = memoryStream.ToArray();
         var newContent = System.Text.Encoding.UTF8.GetString(bytes);
 
+        // Om fil redan finns → spara historik i databasen
         if (File.Exists(fullPath))
         {
             var latestVersion = await _context.FileHistories
@@ -185,7 +210,7 @@ public class FileService
             {
                 FilePath = path,
                 Version = latestVersion + 1,
-                Content = newContent, // 🔥 rätt content
+                Content = newContent,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -193,46 +218,57 @@ public class FileService
             await _context.SaveChangesAsync();
         }
 
-        // skriv filen EFTER
+        // Skriver filen till disk
         await File.WriteAllBytesAsync(fullPath, bytes);
-
-        
-        
     }
 
+    // Tar bort fil eller mapp
     public void DeleteFile(string path)
     {
         var fullPath = GetFullPath(path);
         var storageRoot = Path.GetFullPath(_storagePath);
 
+        // Om fil
         if (File.Exists(fullPath))
         {
             File.Delete(fullPath);
+
+            // Tar bort tomma mappar uppåt
             RemoveEmptyParentDirectories(Path.GetDirectoryName(fullPath), storageRoot);
             return;
         }
 
+        // Om mapp
         if (Directory.Exists(fullPath))
         {
             Directory.Delete(fullPath, recursive: true);
+
             RemoveEmptyParentDirectories(Path.GetDirectoryName(fullPath), storageRoot);
         }
     }
 
+    // Tar bort tomma parent-mappar (cleanup)
     static void RemoveEmptyParentDirectories(string? dir, string storageRoot)
     {
         var current = dir;
+
         while (!string.IsNullOrEmpty(current))
         {
             var normalized = Path.GetFullPath(current);
+
+            // Stoppar vid root
             if (string.Equals(normalized, storageRoot, StringComparison.OrdinalIgnoreCase))
                 break;
+
             if (!Directory.Exists(normalized))
                 break;
+
+            // Om mappen inte är tom → stoppa
             if (Directory.EnumerateFileSystemEntries(normalized).Any())
                 break;
 
             var parent = Path.GetDirectoryName(normalized);
+
             Directory.Delete(normalized);
             current = parent;
         }
