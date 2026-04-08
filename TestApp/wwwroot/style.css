@@ -111,4 +111,8 @@ border: none;
 #deleteButton:hover {
     background: #7a2d2d;
 }
-   
+   .active-version {
+    background-color: #555;
+    color: white;
+    border: 2px solid #fff;
+}

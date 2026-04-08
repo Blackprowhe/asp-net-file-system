@@ -375,6 +375,14 @@ async function loadHistory(path) {
          //när man klickar laddas innehållet i editorn
          // och sätter isViewingHistory till true
         btn.onclick = () => {
+    // ta bort active från alla knappar
+    document.querySelectorAll("#history button").forEach(b => {
+        b.classList.remove("active-version");
+    });
+
+    // lägg till på denna
+    btn.classList.add("active-version");
+
     editor.value = version.content;
     isViewingHistory = true;
 };
