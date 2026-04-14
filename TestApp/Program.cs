@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.SignalR;
 using TestApp.Services;
 using TestApp.Helpers;
@@ -39,7 +40,7 @@ app.UseStaticFiles();
 app.MapGet("/health", () => "Server is running");
 
 // Hämtar alla filer och mappar i root och returnerar dem som JSON
-app.MapGet("/api/files", (FileService fileService,IHubContext<EventsHub> hub) =>
+app.MapGet("/api/files", (FileService fileService, IHubContext<EventsHub> hub) =>
 {
     var rootListing = fileService.GetDirectoryListing("");
     return rootListing is null ? Results.NotFound() : Results.Json(rootListing);
@@ -50,7 +51,7 @@ app.MapGet("/api/files", (FileService fileService,IHubContext<EventsHub> hub) =>
 // Om sökvägen motsvarar en fil returneras filens innehåll (bytes)
 // tillsammans med metadata via HTTP-headers (t.ex. skapad datum, storlek, typ).
 
-app.MapGet("/api/files/{**path}", (string path, FileService fileService, HttpContext context,IHubContext<EventsHub> hub ) =>
+app.MapGet("/api/files/{**path}", (string path, FileService fileService, HttpContext context, IHubContext<EventsHub> hub) =>
 {
     if (fileService.FileExists(path))
     {
@@ -72,9 +73,19 @@ app.MapGet("/api/files/{**path}", (string path, FileService fileService, HttpCon
         context.Response.Headers["X-Bytes"] = metadata.Bytes.ToString();
         context.Response.Headers["X-Extension"] = metadata.Extension ?? "";
 
-        return Results.File(file.Bytes, file.ContentType);
+
+        Console.WriteLine(file.ContentType);
+        Console.WriteLine(file.Bytes.Length);
+        var provider = new FileExtensionContentTypeProvider();
+
+        if (!provider.TryGetContentType(path, out var contentType))
+        {
+            contentType = "application/octet-stream";
+        }
+
+        return Results.File(file.Bytes, contentType);
     }
-    
+
     // om det inte är en fil, kollar vi om det är en mapp
     //och hämtar innehållet.
     if (fileService.DirectoryExists(path))
@@ -117,7 +128,7 @@ app.MapGet("/api/files/history/{**path}", async (string path, AppDbContext conte
 // baserat på sökväg.
 // Returnerar endast metadata i HTTP-headers
 // utan att skicka filinnehåll.
-app.MapMethods("/api/files/{**path}", new[] { "HEAD" }, (string path, FileService fileService, HttpContext context,IHubContext<EventsHub> hub   ) =>
+app.MapMethods("/api/files/{**path}", new[] { "HEAD" }, (string path, FileService fileService, HttpContext context, IHubContext<EventsHub> hub) =>
 {
     // hämta meta data om filen eller mappen
 
@@ -127,7 +138,7 @@ app.MapMethods("/api/files/{**path}", new[] { "HEAD" }, (string path, FileServic
     {
         return Results.NotFound();
     }
-    
+
     // sätter metadata i headers
 
     context.Response.Headers["X-Created-At"] = metadata.Created;
@@ -156,9 +167,9 @@ app.MapPost("/api/files/{**path}", async (
 
     // skickar en realtidsuppdatering via SignalR till 
     // alla anslutna klienter
-    await hub.Clients.All.SendAsync("Event",0, path);
-     
-   
+    await hub.Clients.All.SendAsync("Event", 0, path);
+
+
 
     return Results.Ok();
 });
@@ -179,7 +190,18 @@ app.MapPut("/api/files/{**path}", async (
 {
     var existed = fileService.FileExists(path);
 
-    await fileService.SaveFileAsync(path, request);
+    if (!request.HasFormContentType)
+        return Results.BadRequest("Not form data");
+
+    var form = await request.ReadFormAsync();
+    var file = form.Files["file"];
+
+    if (file == null)
+        return Results.BadRequest("No file");
+
+    using var stream = file.OpenReadStream();
+
+    await fileService.SaveFileStreamAsync(path, stream);
 
     await hub.Clients.All.SendAsync("Event", existed ? 1 : 0, path);
 

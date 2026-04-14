@@ -193,11 +193,31 @@ public class FileService
         }
 
         // Läser request body (filens innehåll)
-        using var memoryStream = new MemoryStream();
-        await request.Body.CopyToAsync(memoryStream);
+        byte[] bytes;
+        string newContent = "";
 
-        var bytes = memoryStream.ToArray();
-        var newContent = System.Text.Encoding.UTF8.GetString(bytes);
+        if (request.HasFormContentType)
+        {
+            var form = await request.ReadFormAsync();
+            var file = form.Files["file"];
+
+            if (file == null)
+                throw new Exception("Ingen fil skickades.");
+
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms);
+            bytes = ms.ToArray();
+
+            newContent = null; // 🔥 viktigt
+        }
+        else
+        {
+            using var memoryStream = new MemoryStream();
+            await request.Body.CopyToAsync(memoryStream);
+
+            bytes = memoryStream.ToArray();
+            newContent = System.Text.Encoding.UTF8.GetString(bytes);
+        }
 
         // Om fil redan finns → spara historik i databasen
         if (File.Exists(fullPath))
@@ -210,7 +230,7 @@ public class FileService
             {
                 FilePath = path,
                 Version = latestVersion + 1,
-                Content = newContent,
+               Content = newContent ?? "",
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -273,4 +293,19 @@ public class FileService
             current = parent;
         }
     }
+    public async Task SaveFileStreamAsync(string path, Stream stream)
+{
+    var fullPath = GetFullPath(path);
+
+    // skapa mapp om behövs
+    var directory = Path.GetDirectoryName(fullPath);
+
+    if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
+    {
+        Directory.CreateDirectory(directory);
+    }
+
+    using var fileStream = File.Create(fullPath);
+    await stream.CopyToAsync(fileStream);
+}
 }

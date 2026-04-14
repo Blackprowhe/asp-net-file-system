@@ -28,40 +28,30 @@ const uploadFileInput = document.getElementById("uploadFileInput");
 
 connection.on("Event", async function (type, path) {
 
-
-
-    // loggar så man kan se när koden uprrepat pajjar.
     console.log("SignalR event:", type, path);
 
-   // tar bort eventuella trailing slashar för att jämföra paths korrekt
-   const normalizedPath = path.replace(/\/$/, "");
+    // 🔥 STOPPA LOOP (VIKTIGAST)
+    if (path === currentFile && type === 1) {
+        console.log("ignorerar self-update");
+        return;
+    }
 
-   // filtrerar bort irrelevanta events som inte påverkar
-   //  den aktuella vyn
-if (currentPath && !normalizedPath.startsWith(currentPath.replace(/\/$/, ""))) {
-    return;
-}
-    // hoppar över uppdateringar om man tittar på historiken
-    //  sparar för att undvika påverkande uppdateringar
-     if (isViewingHistory) return;
+    const normalizedPath = path.replace(/\/$/, "");
 
-     if (isSaving) return;
+    if (currentPath && !normalizedPath.startsWith(currentPath.replace(/\/$/, ""))) {
+        return;
+    }
 
-    
-    // uppdatera listan
+    if (isViewingHistory) return;
+    if (isSaving) return;
+
     await loadFiles(currentPath);
 
-    // hanterar borttagen fil
     if (currentFile === path) {
         if (type === 2) {
-            // fil borttagen
-
-            // förutsatt att detta stämmer.
             currentFile = null;
             fileName.textContent = "Ingen fil vald";
             editor.value = "";
-       
-            
         }
     }
 });
@@ -183,8 +173,6 @@ async function openFile(path) {
 
     // kod för att bilder sak fungera i programmet
     if (path.match(/\.(png|jpg|jpeg|gif)$/i)) {
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
 
     editor.style.display = "none";
 
@@ -193,12 +181,23 @@ async function openFile(path) {
     if (!img) {
         img = document.createElement("img");
         img.id = "imagePreview";
-        img.style.maxWidth = "100%";
+
+        // 🔥 VIKTIGT
+        img.style.maxWidth = "500px";
+        img.style.display = "block";
+        img.style.margin = "20px auto";
+
         document.querySelector(".main").appendChild(img);
     }
 
-    img.src = url;
+    // 🔥 force refresh (viktig!)
+    img.src = "";
+    img.src = `/api/files/${path}?t=${Date.now()}`;
+
     img.style.display = "block";
+
+    console.log("IMG SRC:", img.src);
+
     return;
 }
 
@@ -320,18 +319,12 @@ async function uploadFile() {
         return;
     }
 
-    // läser innehållet i den valda filen som text
-
-    const content = await file.text();
-
-    // skickar post request till backend för att ladda upp filen
+    const formData = new FormData();
+    formData.append("file", file);
 
     const response = await fetch(`/api/files/${file.name}`, {
         method: "POST",
-        headers: {
-            "Content-Type": "text/plain"
-        },
-        body: content
+        body: formData
     });
 
     if (response.status === 409) {
@@ -504,6 +497,56 @@ uploadButton.addEventListener("click", uploadFile);
 // Kopplar även UI-knappar till respektive funktioner (spara, radera, ladda upp).
 // Startar SignalR-anslutningen för realtidsuppdateringar mellan klient och server.
 // Slutligen laddas initial fillista (root) när applikationen startar.
+
+window.addEventListener("load", () => {
+
+    const dropZone = document.getElementById("dropZone");
+
+    if (!dropZone) {
+        console.error("dropZone hittades inte");
+        return;
+    }
+
+    // stoppa default browser beteende
+    ["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
+        dropZone.addEventListener(eventName, e => e.preventDefault());
+    });
+
+    // highlight
+    dropZone.addEventListener("dragover", () => {
+        dropZone.style.background = "#333";
+    });
+
+    dropZone.addEventListener("dragleave", () => {
+        dropZone.style.background = "";
+    });
+
+    // DROP
+    dropZone.addEventListener("drop", async (e) => {
+        console.log("drop funkar");
+
+        const files = e.dataTransfer.files;
+
+        for (const file of files) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            await fetch(`/api/files/${file.name}`, {
+                method: "POST",
+                body: formData
+            });
+        }
+
+        dropZone.style.background = "";
+        await loadFiles();
+    });
+
+    // klick öppnar file picker
+    dropZone.addEventListener("click", () => {
+        document.getElementById("uploadFileInput").click();
+    });
+
+});
 
 connection.start()
     .then(() => console.log("SignalR connected"))

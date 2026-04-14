@@ -2,6 +2,20 @@
 using System.Text;
 using System.Text.Json;
 
+// Detta är en klient som kan synka filer mellan en dator och servern.
+// programmet har två huvud kommandon pull och push,
+// pull hämtar alla filer från servern och sparar lokalt, 
+// och push gör tvärtom, den tar alla filer som finns lokalt och laddar upp till servern,
+// och tar bort filer från servern som inte finns lokalt.
+//Tanken är att det ska fungera som en enkel versionshantering 
+//eller backup, där man alltid kan hålla filer
+// synkade mellan lokalt och servern.
+
+
+// dotnet run push localhost:5137
+//dotnet run pull localhost:5137
+//dotnet run pull localhost:5137 username password
+//dotnet run push localhost:5137 username password
 public class Program
 {
     public static async Task<int> Main(string[] args)
