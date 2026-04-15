@@ -208,7 +208,7 @@ public class FileService
             await file.CopyToAsync(ms);
             bytes = ms.ToArray();
 
-            newContent = null; // 🔥 viktigt
+            newContent = null; 
         }
         else
         {
@@ -293,19 +293,5 @@ public class FileService
             current = parent;
         }
     }
-    public async Task SaveFileStreamAsync(string path, Stream stream)
-{
-    var fullPath = GetFullPath(path);
-
-    // skapa mapp om behövs
-    var directory = Path.GetDirectoryName(fullPath);
-
-    if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
-    {
-        Directory.CreateDirectory(directory);
-    }
-
-    using var fileStream = File.Create(fullPath);
-    await stream.CopyToAsync(fileStream);
-}
+   
 }

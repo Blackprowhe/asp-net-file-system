@@ -190,18 +190,8 @@ app.MapPut("/api/files/{**path}", async (
 {
     var existed = fileService.FileExists(path);
 
-    if (!request.HasFormContentType)
-        return Results.BadRequest("Not form data");
-
-    var form = await request.ReadFormAsync();
-    var file = form.Files["file"];
-
-    if (file == null)
-        return Results.BadRequest("No file");
-
-    using var stream = file.OpenReadStream();
-
-    await fileService.SaveFileStreamAsync(path, stream);
+    //FIX: använd din smarta metod istället
+    await fileService.SaveFileAsync(path, request);
 
     await hub.Clients.All.SendAsync("Event", existed ? 1 : 0, path);
 

@@ -30,7 +30,7 @@ connection.on("Event", async function (type, path) {
 
     console.log("SignalR event:", type, path);
 
-    // 🔥 STOPPA LOOP (VIKTIGAST)
+    // STOPPA LOOP (VIKTIGAST)
     if (path === currentFile && type === 1) {
         console.log("ignorerar self-update");
         return;
@@ -116,7 +116,7 @@ if (Object.keys(data).length === 0) {
 }
 
 // annars loopa filer/mappar
-for (const name in data) {
+for (const name of Object.keys(data)) {
     const item = document.createElement("div");
     item.className = "file-item";
 
@@ -129,19 +129,28 @@ for (const name in data) {
     }
 
     item.addEventListener("click", async () => {
-        document.querySelectorAll(".file-item")
-            .forEach(x => x.classList.remove("active"));
 
-        item.classList.add("active");
+    if (!name) {
+        console.error("❌ name är undefined:", name);
+        return;
+    }
 
-        if (!fileData.file) {
-            await loadFiles(currentPath + name + "/");
-            return;
-        }
+    const fullPath = currentPath ? currentPath + name : name;
 
-        await openFile(currentPath + name);
-    });
+    console.log("CLICK PATH:", fullPath);
 
+    document.querySelectorAll(".file-item")
+        .forEach(x => x.classList.remove("active"));
+
+    item.classList.add("active");
+
+    if (!fileData.file) {
+        await loadFiles(fullPath + "/");
+        return;
+    }
+
+    await openFile(fullPath);
+});
     fileList.appendChild(item);
 }
 }
@@ -182,15 +191,15 @@ async function openFile(path) {
         img = document.createElement("img");
         img.id = "imagePreview";
 
-        // 🔥 VIKTIGT
-        img.style.maxWidth = "500px";
+        
+        img.style.maxWidth = "100%";
         img.style.display = "block";
-        img.style.margin = "20px auto";
+        
 
         document.querySelector(".main").appendChild(img);
     }
 
-    // 🔥 force refresh (viktig!)
+    
     img.src = "";
     img.src = `/api/files/${path}?t=${Date.now()}`;
 
