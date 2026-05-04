@@ -194,7 +194,7 @@ public class FileService
 
         // Läser request body (filens innehåll)
         byte[] bytes;
-        string newContent = "";
+        string? newContent;
 
         if (request.HasFormContentType)
         {
